@@ -168,8 +168,14 @@ _Locally satisfied and verified. Awaiting the deploy._
 
 **Security**
 
-- Public signup must be disabled in the Supabase dashboard. The invite-only model in section 7.1
-  assumes it; nothing in the code can enforce it.
+- Public signup was found enabled on the new project and has been disabled. Verify it with the
+  Management API, not by attempting a signup: a probe against `@example.com` fails with
+  `Email address is invalid` whether signups are open or not, which reads like a pass. The
+  definitive rejection is `Signups not allowed for this instance`.
+
+      curl -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+        "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
+        | grep disable_signup   # must be true
 - `anon` has no grants on any table. Verified: an unauthenticated client gets
   `permission denied for table brands`, not an empty list.
 
@@ -239,7 +245,7 @@ than the bug itself.
 
 | Date       | Issue                                                                                                                                                        | Severity | Status                                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | --------------------------------------- |
-| 2026-09-24 | Public signup being disabled is a dashboard setting, not code. Nothing in the repo enforces or detects it. Confirm it after any Supabase project is recreated. | High     | Open, needs manual confirmation         |
+| 2026-09-24 | Public signup was left enabled on the new project. Anyone with the project URL could have created an account. Fixed via the Management API, confirmed by `Signups not allowed for this instance`. Re-check after any project is recreated — nothing in the repo can enforce it. | High     | Fixed 2026-09-24                        |
 | 2026-09-24 | `/set-password` is referenced by `src/proxy.ts` as a public path and has a Zod schema, but the page does not exist. Invites cannot be accepted until Phase 1.  | Medium   | Open, Phase 1                           |
 | 2026-09-24 | `scripts/verify-rls.mjs` only exercises a super admin. It cannot yet prove a `member` is restricted, because no second account exists.                        | Medium   | Open, Phase 1 adds the non-admin cases  |
 | 2026-09-24 | No backups configured. The free tier's are limited, and §10 calls this the one gap that can actually hurt.                                                     | Medium   | Open, needs a weekly `pg_dump` reminder |
