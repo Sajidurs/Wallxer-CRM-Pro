@@ -15,8 +15,14 @@ import { publicEnv } from "@/lib/env";
  * `lib/auth.ts`. See SYSTEM_DESIGN.md section 7.
  */
 
-/** Reachable while logged out. Everything else redirects to /login. */
-const PUBLIC_PATHS = ["/login", "/set-password", "/auth"];
+/**
+ * Reachable while logged out. Everything else redirects to /login.
+ *
+ * `/api/health` is here so the deployed commit can be checked without a
+ * session — a health check that requires signing in cannot answer "is the app
+ * up" when the answer is no.
+ */
+const PUBLIC_PATHS = ["/login", "/set-password", "/auth", "/api/health"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some(
