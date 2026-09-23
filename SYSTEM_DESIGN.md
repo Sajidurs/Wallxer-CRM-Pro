@@ -936,6 +936,14 @@ Nothing below needs a rewrite. Each maps to a known extension point.
 - **Money:** `numeric(14,2)`, never float. Currency stored beside every amount.
 - **Errors:** server actions return `{ ok: true, data }` or `{ ok: false, error }`. Never throw across the boundary.
 - **Validation:** one Zod schema per entity in `schema.ts`, imported by both the form and the action.
+  **Every schema must be idempotent:** `parse(parse(x))` has to succeed and return the same value.
+  React Hook Form submits the resolver's *output*, and the action re-validates that output with the
+  same schema, so a schema that emits `null` must also accept `null`. Use `optionalText` and
+  `optionalId` from `lib/zod.ts`, which are `.nullish()` for exactly this reason, and add new
+  schemas to `scripts/verify-schemas.ts`.
+- **Action errors:** build field errors with `fieldErrorsFromZod`, never `error.flatten()`. Flatten
+  collapses nested paths such as `address.city` onto the parent key, which matches no form input, so
+  the message renders nowhere.
 - **Secrets:** anything prefixed `NEXT_PUBLIC_` is public. Treat it as printed on a billboard.
 
 ---

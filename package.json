@@ -12,7 +12,8 @@
     "db:seed": "supabase db push --include-seed",
     "types:generate": "supabase gen types typescript --linked > src/types/database.types.ts",
     "bootstrap:admin": "node --env-file=.env.local scripts/bootstrap-admin.mjs",
-    "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs"
+    "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs",
+    "verify:schemas": "tsx scripts/verify-schemas.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -45,6 +46,7 @@
     "eslint-config-next": "16.3.6",
     "supabase": "^2.117.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

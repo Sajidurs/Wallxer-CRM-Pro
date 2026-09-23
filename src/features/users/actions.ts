@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { fail, ok, type ActionResult } from "@/lib/action-result";
+import { fieldErrorsFromZod, firstIssueMessage } from "@/lib/zod";
 import { getCurrentUser } from "@/lib/auth";
 import { publicEnv } from "@/lib/env";
 import { atLeast } from "@/lib/permissions";
@@ -66,8 +67,8 @@ export async function inviteUser(
   const parsed = inviteUserSchema.safeParse(input);
   if (!parsed.success) {
     return fail(
-      "Check the details below.",
-      parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      firstIssueMessage(parsed.error),
+      fieldErrorsFromZod(parsed.error),
     );
   }
 
@@ -280,8 +281,8 @@ export async function updateOwnProfile(
   const parsed = updateOwnProfileSchema.safeParse(input);
   if (!parsed.success) {
     return fail(
-      "Check the details below.",
-      parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      firstIssueMessage(parsed.error),
+      fieldErrorsFromZod(parsed.error),
     );
   }
 

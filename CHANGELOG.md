@@ -102,6 +102,7 @@ Phases 3 and 7.
 | `npm run types:generate`   | Regenerates `src/types/database.types.ts`                |
 | `npm run bootstrap:admin`  | Creates or promotes a super admin                        |
 | `npm run verify:rls`       | Asserts the policies hold. Needs `CHECK_EMAIL` and `CHECK_PASSWORD` |
+| `npm run verify:schemas`   | Asserts every Zod schema is idempotent. Run after touching one     |
 
 ---
 
@@ -134,6 +135,50 @@ uploaded file that downloads through a signed URL and cannot be fetched without 
 ---
 
 ## Unreleased
+
+### 2026-09-24 — Fix: schemas were not idempotent, so no form with an empty optional field could save
+
+**Fixed**
+
+- Creating a contact always failed with "Check the details below." and marked no field.
+- Saving your profile with an empty phone or job title failed the same way. Shipped in Phase 1,
+  found only while investigating the contacts report.
+
+**Root cause.** React Hook Form's `handleSubmit` passes the submit handler the resolver's
+**output**, so a form submits transformed values. The server action then re-validates that output
+with the same schema, because the client is not trustworthy. The optional-text helper was
+`z.string().optional().transform(v => v?.trim() || null)`: it emits `null` but only accepts
+`string | undefined`, so the second parse rejected every empty optional field. Thirteen fields
+failed on a blank contact form.
+
+It was invisible because the failures landed on `companyName` — hidden when the type is "person" —
+and on `address.*`, and `error.flatten().fieldErrors` collapses nested paths onto the parent key,
+which matches no input. So nothing rendered but the generic banner.
+
+**Changed**
+
+- New `src/lib/zod.ts` with `optionalText` and `optionalId`, both `.nullish()` so their own output
+  parses again. Contacts and users schemas now use them.
+- `fieldErrorsFromZod` keys errors by dotted path (`address.city`), which is how React Hook Form
+  addresses nested fields, so messages land on the right input.
+- `firstIssueMessage` replaces the fixed "Check the details below." string, so an error on a field
+  the form is not currently rendering is still legible. All six actions use both.
+- New `scripts/verify-schemas.ts` and `npm run verify:schemas`: asserts `parse(parse(x))` succeeds
+  and is stable, for all 12 schemas. Added `tsx` as a dev dependency to run it.
+
+**Files touched:** `src/lib/zod.ts`, `src/features/contacts/schema.ts`, `src/features/users/schema.ts`,
+`src/features/{auth,users,contacts}/actions.ts`, `scripts/verify-schemas.ts`, `package.json`
+
+**Migration:** none
+
+**Notes:**
+
+- **Why the tests missed it.** Both end-to-end harnesses called the actions with hand-written raw
+  input — strings and omitted keys. A real form sends transformed output. The harness was testing a
+  payload no browser ever produces. Re-verified by submitting the exact post-transform payload,
+  which fails against the old code and passes against the new.
+- The lesson generalises past Zod: when a boundary transforms data, test it with what actually
+  crosses it, not with what is convenient to type in a test.
 
 ### 2026-09-24 — Deployed, and Phase 2, Contacts
 

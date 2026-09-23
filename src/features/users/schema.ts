@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { optionalText } from "@/lib/zod";
+
 export const USER_ROLES = ["super_admin", "admin", "manager", "member"] as const;
 
 export const ROLE_LABELS: Record<(typeof USER_ROLES)[number], string> = {
@@ -40,11 +42,7 @@ export const inviteUserSchema = z.object({
     .max(120, "That name is too long")
     .transform((v) => v.trim()),
   role: z.enum(USER_ROLES),
-  jobTitle: z
-    .string()
-    .max(120, "That job title is too long")
-    .optional()
-    .transform((v) => v?.trim() || undefined),
+  jobTitle: optionalText(120, "That job title is too long"),
   delivery: z.enum(DELIVERY_METHODS),
 });
 
@@ -71,16 +69,10 @@ export const updateOwnProfileSchema = z.object({
     .min(2, "Enter your full name")
     .max(120, "That name is too long")
     .transform((v) => v.trim()),
-  phone: z
-    .string()
-    .max(40, "That phone number is too long")
-    .optional()
-    .transform((v) => v?.trim() || null),
-  jobTitle: z
-    .string()
-    .max(120, "That job title is too long")
-    .optional()
-    .transform((v) => v?.trim() || null),
+  // nullish, not optional: these produce null, and the server re-parses the
+  // output the form submits. See lib/zod.ts.
+  phone: optionalText(40, "That phone number is too long"),
+  jobTitle: optionalText(120, "That job title is too long"),
   timezone: z.string().min(1, "Pick a timezone").max(64),
 });
 

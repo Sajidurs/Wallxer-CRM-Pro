@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { fail, ok, type ActionResult } from "@/lib/action-result";
+import { fieldErrorsFromZod, firstIssueMessage } from "@/lib/zod";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
@@ -61,8 +62,8 @@ export async function createContact(
   const parsed = contactSchema.safeParse(input);
   if (!parsed.success) {
     return fail(
-      "Check the details below.",
-      parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      firstIssueMessage(parsed.error),
+      fieldErrorsFromZod(parsed.error),
     );
   }
 
@@ -98,8 +99,8 @@ export async function updateContact(
   const parsed = updateContactSchema.safeParse(input);
   if (!parsed.success) {
     return fail(
-      "Check the details below.",
-      parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      firstIssueMessage(parsed.error),
+      fieldErrorsFromZod(parsed.error),
     );
   }
 

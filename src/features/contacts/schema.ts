@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { optionalId, optionalText } from "@/lib/zod";
+
 export const CONTACT_TYPES = ["person", "company"] as const;
 export type ContactType = (typeof CONTACT_TYPES)[number];
 
@@ -29,14 +31,6 @@ export const COMMON_SOURCES = [
   "Existing client",
 ] as const;
 
-/** Empty inputs arrive as "" from the form; the database wants null. */
-const optionalText = (max: number, message: string) =>
-  z
-    .string()
-    .max(max, message)
-    .optional()
-    .transform((value) => value?.trim() || null);
-
 export const addressSchema = z.object({
   street: optionalText(200, "That street is too long"),
   city: optionalText(100, "That city is too long"),
@@ -55,11 +49,12 @@ export const contactSchema = z
     jobTitle: optionalText(120, "That job title is too long"),
 
     // Not z.email(): an empty field is valid, and a contact with only a phone
-    // number is a normal thing to have.
+    // number is a normal thing to have. `.nullish()` so the null this produces
+    // survives a second parse — see lib/zod.ts.
     email: z
       .string()
       .max(200, "That email is too long")
-      .optional()
+      .nullish()
       .transform((value) => value?.trim().toLowerCase() || null)
       .refine(
         (value) => value === null || z.email().safeParse(value).success,
@@ -70,9 +65,9 @@ export const contactSchema = z
     whatsapp: optionalText(40, "That number is too long"),
     website: optionalText(200, "That URL is too long"),
 
-    brandId: z.uuid().nullable().optional().transform((v) => v ?? null),
-    ownerId: z.uuid().nullable().optional().transform((v) => v ?? null),
-    parentContactId: z.uuid().nullable().optional().transform((v) => v ?? null),
+    brandId: optionalId(),
+    ownerId: optionalId(),
+    parentContactId: optionalId(),
 
     status: z.enum(CONTACT_STATUSES),
     source: optionalText(80, "That source is too long"),
