@@ -188,8 +188,13 @@ _Locally satisfied and verified. Awaiting the deploy._
 - Verified against the running app: 11/11 RLS checks pass, 5/5 logged-out route checks, 8/8
   logged-in checks. The last-super-admin guard and the anon lockout are both confirmed by test, not
   by inspection.
-- Port 3000 is occupied by an unrelated Node process on the dev machine; the local verification ran
-  on 3100.
+- Verified again on `next dev` at port 3000, including the login server action end to end: a correct
+  password returns `{"ok":true}` and sets the session cookie, a wrong one returns the deliberately
+  vague "That email and password do not match an account."
+- Server action IDs differ between the dev and production builds. When invoking an action directly
+  for testing, read the id from the matching manifest — `.next/dev/server/...` for `next dev`,
+  `.next/server/...` for `next start` — or the request 404s for a reason that has nothing to do
+  with the code.
 - `npm run types:generate` overwrites `src/types/database.types.ts` wholesale. Run it after every
   migration and commit the result, or every query in the next session is typed against a schema
   that no longer exists.
