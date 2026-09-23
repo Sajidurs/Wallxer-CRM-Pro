@@ -87,8 +87,11 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          invited_at: string | null
+          invited_by: string | null
           job_title: string | null
           last_seen_at: string | null
+          must_change_password: boolean
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
           status: Database["public"]["Enums"]["user_status"]
@@ -102,8 +105,11 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          invited_at?: string | null
+          invited_by?: string | null
           job_title?: string | null
           last_seen_at?: string | null
+          must_change_password?: boolean
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
@@ -117,8 +123,11 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          invited_at?: string | null
+          invited_by?: string | null
           job_title?: string | null
           last_seen_at?: string | null
+          must_change_password?: boolean
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
@@ -127,6 +136,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -176,6 +192,7 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      touch_last_seen: { Args: never; Returns: undefined }
     }
     Enums: {
       user_role: "super_admin" | "admin" | "manager" | "member"

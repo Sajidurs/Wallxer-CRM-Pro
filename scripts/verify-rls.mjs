@@ -124,6 +124,185 @@ if (!brandInsert.error) {
   await user.from("brands").delete().eq("name", "__rls_probe__");
 }
 
+// ---------------------------------------------------------------------------
+// 7. A member account, created and torn down here.
+// ---------------------------------------------------------------------------
+// Everything above proves a super admin can act. These prove the restrictions
+// actually restrict, which is the half that fails silently when a policy is
+// wrong. Needs the service role to create the throwaway account.
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!serviceKey) {
+  console.log(
+    "\nSkipping member-role checks: SUPABASE_SERVICE_ROLE_KEY is not set.\n",
+  );
+} else {
+  const admin = createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const memberEmail = `rls-probe-${Date.now()}@my-boost.ca`;
+  const memberPassword = `Probe!${Math.random().toString(36).slice(2)}Aa1`;
+  let memberId = null;
+
+  try {
+    const { data: created, error: createError } =
+      await admin.auth.admin.createUser({
+        email: memberEmail,
+        password: memberPassword,
+        email_confirm: true,
+        user_metadata: { full_name: "RLS Probe", role: "member" },
+      });
+
+    if (createError) throw new Error(createError.message);
+    memberId = created.user.id;
+
+    // handle_new_user reads the role from metadata; make it explicit anyway.
+    await admin
+      .from("profiles")
+      .update({ role: "member", status: "active", must_change_password: false })
+      .eq("id", memberId);
+
+    const member = createClient(url, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { error: memberSignInError } = await member.auth.signInWithPassword({
+      email: memberEmail,
+      password: memberPassword,
+    });
+    check(
+      "member can sign in",
+      !memberSignInError,
+      memberSignInError?.message ?? "ok",
+    );
+
+    const memberRole = await member.rpc("auth_role");
+    check(
+      "member auth_role() returns member",
+      memberRole.data === "member",
+      memberRole.error?.message ?? String(memberRole.data),
+    );
+
+    const memberIsAdmin = await member.rpc("is_admin");
+    check(
+      "member is_admin() returns false",
+      memberIsAdmin.data === false,
+      memberIsAdmin.error?.message ?? String(memberIsAdmin.data),
+    );
+
+    // The escalation that matters most: promoting yourself.
+    const selfPromote = await member
+      .from("profiles")
+      .update({ role: "super_admin" })
+      .eq("id", memberId);
+    check(
+      "member cannot promote themselves",
+      !!selfPromote.error,
+      selfPromote.error?.message ?? "NO ERROR — a member just became super admin",
+    );
+
+    // Attacking someone else's row.
+    //
+    // Assert the target is UNCHANGED, not that the statement errored. RLS
+    // filters rows rather than raising, so a blocked write returns success with
+    // zero rows affected. Checking for an error here would have reported a
+    // failure while the database was behaving perfectly — and, worse, checking
+    // only the error would pass just as happily if the write had succeeded.
+    async function targetRow() {
+      const { data } = await admin
+        .from("profiles")
+        .select("role, status")
+        .eq("id", signIn.user.id)
+        .single();
+      return data;
+    }
+
+    const before = await targetRow();
+
+    await member.from("profiles").update({ role: "member" }).eq("id", signIn.user.id);
+    const afterRole = await targetRow();
+    check(
+      "member cannot change another user's role",
+      afterRole.role === before.role && before.role === "super_admin",
+      `target role still ${afterRole.role}`,
+    );
+
+    await member
+      .from("profiles")
+      .update({ status: "suspended" })
+      .eq("id", signIn.user.id);
+    const afterStatus = await targetRow();
+    check(
+      "member cannot suspend an admin",
+      afterStatus.status === "active",
+      `target status still ${afterStatus.status}`,
+    );
+
+    // must_change_password is server-set. A user clearing it would skip a
+    // forced password change.
+    const clearFlag = await member
+      .from("profiles")
+      .update({ must_change_password: true })
+      .eq("id", memberId);
+    check(
+      "member cannot set must_change_password",
+      !!clearFlag.error,
+      clearFlag.error?.message ?? "NO ERROR — the flag is client-writable",
+    );
+
+    const memberBrandInsert = await member
+      .from("brands")
+      .insert({
+        workspace_id: (await member.from("workspaces").select("id")).data[0].id,
+        name: "__member_probe__",
+      })
+      .select();
+    check(
+      "member cannot create a brand",
+      !!memberBrandInsert.error,
+      memberBrandInsert.error?.message ?? "NO ERROR — members can edit settings",
+    );
+
+    // Reading colleagues is allowed, and the app depends on it.
+    const memberReadsProfiles = await member.from("profiles").select("email");
+    check(
+      "member can read workspace profiles",
+      (memberReadsProfiles.data?.length ?? 0) >= 2,
+      memberReadsProfiles.error?.message ??
+        `rows: ${memberReadsProfiles.data?.length}`,
+    );
+
+    // Suspension must deny immediately, without deleting anything.
+    await admin.from("profiles").update({ status: "suspended" }).eq("id", memberId);
+
+    const suspended = createClient(url, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    await suspended.auth.signInWithPassword({
+      email: memberEmail,
+      password: memberPassword,
+    });
+    const suspendedRead = await suspended.from("brands").select("name");
+    check(
+      "suspended user reads nothing",
+      (suspendedRead.data?.length ?? 0) === 0,
+      suspendedRead.error?.message ?? `rows: ${suspendedRead.data?.length}`,
+    );
+
+    const suspendedWorkspace = await suspended.rpc("auth_workspace_id");
+    check(
+      "suspended user has no workspace",
+      suspendedWorkspace.data === null,
+      suspendedWorkspace.error?.message ?? String(suspendedWorkspace.data),
+    );
+  } finally {
+    if (memberId) {
+      await admin.from("brands").delete().eq("name", "__member_probe__");
+      await admin.auth.admin.deleteUser(memberId);
+    }
+  }
+}
+
 console.log("");
 for (const r of results) {
   console.log(`${r.passed ? "PASS" : "FAIL"}  ${r.name}\n        ${r.detail}`);

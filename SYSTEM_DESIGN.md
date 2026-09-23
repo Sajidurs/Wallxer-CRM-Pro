@@ -795,11 +795,41 @@ links. The section has an "add another" control with no fixed limit, backed by `
 
 ### 8.6 Users
 
-Super admin and admin only. Invite by email, assign role and brand access, suspend, and reset
-password. Suspending sets status to `suspended`, which `auth_role()` returns null for, so every
+Super admin and admin only. Add a user, assign a role, suspend, and reset password. Suspending sets
+status to `suspended`, which `auth_role()` and `auth_workspace_id()` both return null for, so every
 policy denies that user instantly without deleting their history.
 
 Users are never hard deleted. Their created records keep valid foreign keys.
+
+**Role changes are super-admin only**, per section 7.2, enforced by a trigger. An earlier draft of
+section 4 implied an admin could change roles; section 7.2 wins, because it is the one backed by
+the database.
+
+**There is no per-user brand access.** An earlier draft of this section mentioned assigning "brand
+access", but no such model exists in section 5 and it contradicts section 1: one shared workspace,
+brands as a tag, the whole team sees everything. If brand-level restriction is ever wanted, it is a
+`profile_brands` junction table plus a clause in `auth_workspace_id()`'s callers — not a change to
+this module.
+
+**Two ways in**, because outbound email cannot be assumed:
+
+| Delivery           | Mechanism                                     | Needs        |
+| ------------------ | --------------------------------------------- | ------------ |
+| Email invite       | `auth.admin.inviteUserByEmail`                | Working SMTP |
+| Temporary password | `auth.admin.createUser`, shown once to the admin | Nothing   |
+
+Supabase's built-in mailer allows **two messages an hour** and, on a new project, delivers only to
+addresses on the Supabase organisation. Until custom SMTP is configured, the temporary-password
+path is the only one that works. `SUPABASE_EMAIL_ENABLED=true` switches the dialog's default once
+SMTP exists; it never restricts what is allowed.
+
+A handed-over password sets `profiles.must_change_password`, and `requireUser()` diverts to
+`/set-password` until it is replaced. The flag is server-set: the guard trigger rejects any client
+attempt to change it, or skipping the forced change would be one API call away.
+
+`/auth/callback` accepts all three shapes Supabase can deliver a session in — `?code`, `?token_hash`
+with `&type`, and a `#access_token` fragment. It is a client component because the fragment never
+reaches the server.
 
 ---
 

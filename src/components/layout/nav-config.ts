@@ -81,14 +81,13 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/settings/users",
         icon: UsersRound,
         resource: "user",
-        phase: 1,
       },
       {
         title: "Brands",
         href: "/settings/brands",
         icon: Palette,
         resource: "brand",
-        phase: 1,
+        phase: 2,
       },
       {
         title: "Pipelines",

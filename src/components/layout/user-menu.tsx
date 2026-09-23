@@ -1,6 +1,7 @@
 "use client";
 
 import { LogOut, User as UserIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
@@ -92,10 +93,11 @@ export function UserMenu({ fullName, email, role, avatarUrl }: UserMenuProps) {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem disabled>
-          <UserIcon />
-          Profile
-          <span className="ml-auto text-xs text-muted-foreground">Phase 1</span>
+        <DropdownMenuItem asChild>
+          <Link href="/settings/profile">
+            <UserIcon />
+            Profile
+          </Link>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />

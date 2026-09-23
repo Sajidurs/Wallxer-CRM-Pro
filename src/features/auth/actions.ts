@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { fail, ok, type ActionResult } from "@/lib/action-result";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 import { loginSchema, setPasswordSchema } from "./schema";
@@ -88,6 +89,22 @@ export async function setPassword(
   });
 
   if (error) return fail(error.message);
+
+  // Lift the forced change. This goes through the service role because the
+  // guard trigger in migration 0003 deliberately stops a user from clearing
+  // this flag themselves — otherwise skipping the forced change is one API
+  // call away.
+  const admin = createAdminClient();
+  const { error: flagError } = await admin
+    .from("profiles")
+    .update({ must_change_password: false, status: "active" })
+    .eq("id", user.id);
+
+  if (flagError) {
+    return fail(
+      `Your password was changed, but the account could not be unlocked: ${flagError.message}`,
+    );
+  }
 
   revalidatePath("/", "layout");
   return ok();

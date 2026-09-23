@@ -45,7 +45,7 @@ Update this file at the end of every work session, before you stop.
 ## Current State
 
 **Last updated:** 2026-09-24
-**Phase:** 0 (complete locally, not yet deployed)
+**Phase:** 1 complete. Phase 0 step 10 (deploy) still outstanding.
 **Deployed:** no
 **Supabase project:** `wjtokyywsuummyaumyty`, free tier
 **Repo:** https://github.com/Sajidurs/Wallxer-CRM-Pro, branch `main`
@@ -64,8 +64,8 @@ Update this file at the end of every work session, before you stop.
 | Module                            | Status               | Notes                                    |
 | --------------------------------- | -------------------- | ---------------------------------------- |
 | Foundation (auth, workspace, RLS) | Done, not deployed   | Only step 10 of Phase 0 remains          |
-| Users management                  | Not started          | Phase 1, next up                         |
-| Contacts                          | Not started          | Phase 2                                  |
+| Users management                  | Done, not deployed   | Email-invite path untested, no SMTP      |
+| Contacts                          | Not started          | Phase 2, next up                         |
 | Projects, credentials, files      | Not started          | Phase 3                                  |
 | Tasks                             | Not started          | Phase 4                                  |
 | Pipeline                          | Not started          | Phase 5                                  |
@@ -78,6 +78,7 @@ Update this file at the end of every work session, before you stop.
 | ---------------------- | --------------------------------- |
 | `0001_foundation.sql`  | Yes, 2026-09-24                   |
 | `0002_rls_helpers.sql` | Yes, 2026-09-24                   |
+| `0003_users_management.sql` | Yes, 2026-09-24              |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -110,18 +111,20 @@ Phases 3 and 7.
    `NEXT_PUBLIC_APP_URL` set to the deployed URL), then confirm login works in production.
    Add the deployed URL to Supabase Auth → URL Configuration → Redirect URLs.
 
-**Then Phase 1, Users management.** Built before contacts because every other module's permissions
-need real accounts to test against.
+**Optional but recommended: custom SMTP.** Until it exists, email invites and password-reset emails
+cannot work. Resend's free tier is 3,000 messages a month and needs a verified domain. Set
+`SUPABASE_EMAIL_ENABLED=true` afterwards and test the invite path, which has never been executed.
 
-1. `features/users/`: `schema.ts`, `queries.ts`, `actions.ts`, `components/`.
-2. Invite by email through `lib/supabase/admin.ts` and `auth.admin.inviteUserByEmail`, carrying
-   `full_name` and `role` in user metadata — `handle_new_user` already reads both.
-3. `/set-password` page for accepting an invite. The route and the Zod schema
-   (`setPasswordSchema`) exist; the page does not.
-4. Users table: name, email, role, status, last seen. Change role, suspend, reactivate.
-5. Own-profile editing, which the user menu currently shows as disabled.
-6. Extend `scripts/verify-rls.mjs` with a non-admin user: prove a `member` cannot change a role and
-   cannot reach `/settings/users`.
+**Then Phase 2, Contacts.**
+
+1. Migration `0004_contacts.sql`: the `contacts` table from section 5.2, its indexes, the full-text
+   search index, and RLS policies following the standard pattern.
+2. `features/contacts/`: `schema.ts`, `queries.ts`, `actions.ts`, `components/`.
+3. List with server-side pagination, full-text search, and filters on brand, type, owner, tags.
+   This is where TanStack Table earns its place; the users table did not need it.
+4. Detail page with tabs. Only Overview is real in Phase 2; the rest arrive with their modules.
+5. `parent_contact_id` linking a person to a company.
+6. Extend `scripts/verify-rls.mjs`: a member can create and edit a contact but not delete one.
 
 **Definition of done for Phase 0:** a real person can log in on the deployed URL, see an empty
 dashboard shell, and be blocked from every route when logged out.
@@ -130,6 +133,66 @@ _Locally satisfied and verified. Awaiting the deploy._
 ---
 
 ## Unreleased
+
+### 2026-09-24 — Phase 1, Users management
+
+**Added**
+
+- Migration `0003_users_management.sql`: `profiles.must_change_password`, `invited_by`,
+  `invited_at`, a `touch_last_seen()` function, and an extended privileged-column guard.
+- `features/users/` following the module contract: `schema.ts`, `queries.ts`, `actions.ts`,
+  `components/`.
+- `/settings/users`: the team list with role, status, and last seen, an Add user dialog, and row
+  actions for changing role, suspending, reactivating, and resetting a password.
+- Two ways to add a user. An email invite via `inviteUserByEmail`, and a temporary password shown
+  to the admin exactly once. The second exists because the built-in Supabase mailer allows two
+  messages an hour and may not deliver outside the Supabase organisation.
+- `/set-password` and `/auth/callback`, completing the invite-acceptance flow that Phase 0 left as
+  a known issue. The callback handles all three session shapes Supabase can send.
+- `/settings/profile`: edit your own name, job title, phone, and timezone, and change your password.
+  The Profile entry in the user menu is no longer disabled.
+- `last_seen_at`, written through an RPC throttled to one write per five minutes.
+
+**Changed**
+
+- `requireUser()` now diverts to `/set-password` when `must_change_password` is set, so a
+  handed-over password cannot quietly become a permanent one.
+- `SetPasswordForm` takes `redirectTo`, `submitLabel`, and `successMessage`, so the same form serves
+  invite acceptance and a self-service password change.
+- Both Select fields moved from `watch`/`setValue` to `Controller`. `watch()` cannot be memoised, so
+  React Compiler was skipping those components entirely.
+- `scripts/verify-rls.mjs` creates a throwaway member account and tears it down, covering the
+  restrictions rather than only the permissions. 11 checks to 22.
+
+**Security**
+
+- A member POSTing directly to `inviteUser` with `role: super_admin` is refused. Verified, not
+  assumed: the button is not the check, `requireActor` in the action is.
+- `inviteUser` refuses to create a super admin unless the caller is one. The role travels in user
+  metadata and `handle_new_user` trusts it on INSERT, where the privileged-column trigger does not
+  apply, so this gap is only closable in the action.
+- `resetUserPassword` refuses to reset a super admin's password unless the caller is a super admin.
+  Resetting it is a full account takeover.
+- An admin can no longer suspend their own account, which was the other easy route to locking the
+  workspace out of user management.
+- `must_change_password` is server-set. The guard trigger rejects any client write to it.
+
+**Files touched:** `supabase/migrations/0003_users_management.sql`, `src/features/users/**`,
+`src/features/auth/**`, `src/app/(app)/settings/**`, `src/app/(auth)/**`, `src/lib/auth.ts`,
+`src/lib/env.ts`, `src/components/layout/**`, `scripts/verify-rls.mjs`
+
+**Migration:** `supabase/migrations/0003_users_management.sql`, applied to `wjtokyywsuummyaumyty`.
+
+**Notes:**
+
+- Verified: 22/22 RLS checks, and 19/19 end-to-end checks driving the real server actions over HTTP.
+- **The email-invite path is written but untested**, because the project has no SMTP. It cannot be
+  confirmed until custom SMTP exists. The temporary-password path is fully tested.
+- Two design contradictions were resolved rather than guessed at. See the Decision Log.
+- Testing server actions over HTTP: a route exposes every action imported anywhere in its tree, and
+  they are indistinguishable by id from outside. `signOut()` ignores its arguments and returns
+  `ok: true`, so a harness that probes ids and stops at the first success both reports a false pass
+  and destroys its own session. Identify an action by its effect on the database.
 
 ### 2026-09-24 — Phase 0 foundation
 
@@ -240,6 +303,12 @@ so nobody relitigates a settled question six months from now.
 | 2026-09-24 | The last active super admin cannot be demoted or suspended, service role included | Losing the only super admin locks the workspace out of user management with no path back through the UI. Promote a replacement first. |
 | 2026-09-24 | Stub pages for unbuilt modules rather than no route at all | The sidebar doubles as the roadmap, and a stub that names its phase reads as deliberate where a 404 reads as a bug. |
 | 2026-09-24 | `scripts/verify-rls.mjs` kept as a permanent script | A policy that silently fails open looks exactly like one that works. The only way to know is to assert it against the real database after every schema change. |
+| 2026-09-24 | Users can be added by email invite **or** by a temporary password shown once | Supabase's built-in mailer allows 2 messages an hour and may not deliver outside the Supabase org. Shipping only the email path would have made Phase 1 untestable and onboarding impossible until SMTP existed. |
+| 2026-09-24 | Role changes stay super-admin only, resolving the §4 / §7.2 contradiction | §7.2 is the one backed by a database trigger. Loosening it would mean weakening an enforced rule to match prose; tightening the prose costs nothing. |
+| 2026-09-24 | No per-user brand access, resolving the §8.6 / §1 contradiction | §8.6 mentioned "brand access" but no such model exists in §5, and §1 plus the original Decision Log say brands filter and never isolate. Inventing a permission model to satisfy one clause would have contradicted the architecture. |
+| 2026-09-24 | A handed-over password forces a change via `must_change_password`, guarded server-side | A temporary password passed over chat is a shared secret. Making the flag client-writable would put skipping the change one API call away. |
+| 2026-09-24 | Admin-initiated "reset password" issues a new temporary password rather than emailing a link | Same email constraint. It also works identically whether or not SMTP is ever configured, so the recovery path never depends on deliverability. |
+| 2026-09-24 | `/auth/callback` is a client component handling three token shapes | Which shape Supabase sends depends on the flow and the email template, neither of which this app controls. The `#access_token` fragment never reaches a server route handler at all. |
 
 ---
 
@@ -251,10 +320,12 @@ than the bug itself.
 | Date       | Issue                                                                                                                                                        | Severity | Status                                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | --------------------------------------- |
 | 2026-09-24 | Public signup was left enabled on the new project. Anyone with the project URL could have created an account. Fixed via the Management API, confirmed by `Signups not allowed for this instance`. Re-check after any project is recreated — nothing in the repo can enforce it. | High     | Fixed 2026-09-24                        |
-| 2026-09-24 | `/set-password` is referenced by `src/proxy.ts` as a public path and has a Zod schema, but the page does not exist. Invites cannot be accepted until Phase 1.  | Medium   | Open, Phase 1                           |
-| 2026-09-24 | `scripts/verify-rls.mjs` only exercises a super admin. It cannot yet prove a `member` is restricted, because no second account exists.                        | Medium   | Open, Phase 1 adds the non-admin cases  |
+| 2026-09-24 | `/set-password` did not exist, so invites could not be accepted.                                                                                              | Medium   | Fixed 2026-09-24, Phase 1               |
+| 2026-09-24 | `scripts/verify-rls.mjs` only exercised a super admin, so it could not prove restrictions restrict.                                                            | Medium   | Fixed 2026-09-24, now 22 checks          |
+| 2026-09-24 | Profile menu and password change were disabled in the user menu.                                                                                              | Low      | Fixed 2026-09-24, `/settings/profile`   |
+| 2026-09-24 | No SMTP. The email-invite path is written but has never been executed, and password-reset-by-email does not exist. Temporary passwords cover both for now.     | Medium   | Open, needs custom SMTP                 |
 | 2026-09-24 | No backups configured. The free tier's are limited, and §10 calls this the one gap that can actually hurt.                                                     | Medium   | Open, needs a weekly `pg_dump` reminder |
-| 2026-09-24 | Profile menu and password change are rendered disabled in the user menu.                                                                                      | Low      | Open, Phase 1                           |
+| 2026-09-24 | Not deployed. Phase 0 step 10 is still outstanding, and Supabase's Site URL is still `http://localhost:3000`, which will break invite links in production.     | Medium   | Open, needs the Vercel deploy           |
 
 ---
 

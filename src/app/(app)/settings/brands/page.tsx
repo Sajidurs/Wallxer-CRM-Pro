@@ -12,7 +12,7 @@ export default async function Page() {
     <ComingSoon
       title="Brands"
       description="The brands records are tagged with."
-      phase={1}
+      phase={2}
     />
   );
 }

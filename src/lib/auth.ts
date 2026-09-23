@@ -51,7 +51,33 @@ export async function requireUser(): Promise<Profile> {
     redirect("/login");
   }
 
+  // An account created with a handed-over password, or one an admin has just
+  // reset, cannot go anywhere else until that password is replaced. Checking it
+  // here covers every page in the (app) group at once.
+  if (profile.must_change_password) {
+    redirect("/set-password");
+  }
+
+  await touchLastSeen();
+
   return profile;
+}
+
+/**
+ * Records that the user is still around, throttled to one write per five
+ * minutes inside the database function so this costs nothing on a page load
+ * that already happened recently.
+ *
+ * Never allowed to break a page render: a failed heartbeat is not worth an
+ * error screen.
+ */
+async function touchLastSeen(): Promise<void> {
+  try {
+    const supabase = await createClient();
+    await supabase.rpc("touch_last_seen");
+  } catch {
+    // Intentionally swallowed.
+  }
 }
 
 /** For pages only some roles may open, such as Settings. */

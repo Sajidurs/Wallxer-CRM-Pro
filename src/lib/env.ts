@@ -36,4 +36,14 @@ export const serverEnv = {
       "SUPABASE_SERVICE_ROLE_KEY",
       process.env.SUPABASE_SERVICE_ROLE_KEY,
     ),
+
+  /**
+   * Whether outbound email can be relied on.
+   *
+   * Defaults to false, because Supabase's built-in mailer allows two messages
+   * an hour and on a new project only delivers to addresses on the Supabase
+   * org. Set this to true once custom SMTP is configured; it only changes which
+   * option the Add user dialog defaults to, never what is allowed.
+   */
+  emailEnabled: () => process.env.SUPABASE_EMAIL_ENABLED === "true",
 };
