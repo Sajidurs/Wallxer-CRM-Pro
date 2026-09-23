@@ -56,7 +56,7 @@ Section 11 explains how each of those slots in without a rewrite.
 
 | Layer        | Choice                             | Why                                                                                                         |
 | ------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Framework    | Next.js 15, App Router, TypeScript | Server components cut client bundle size, server actions remove the need for a separate API layer early on. |
+| Framework    | Next.js 16, App Router, TypeScript | Server components cut client bundle size, server actions remove the need for a separate API layer early on. |
 | Database     | Supabase Postgres                  | Relational data with real foreign keys, plus RLS enforced at the database, not in app code.                 |
 | Auth         | Supabase Auth, email and password  | Invite only. Public signup disabled.                                                                        |
 | Storage      | Supabase Storage, private buckets  | Fits the document and image workload.                                                                       |
@@ -72,6 +72,25 @@ Section 11 explains how each of those slots in without a rewrite.
 **Deliberately not used in v1:** a separate backend service, an ORM such as Prisma (the generated
 Supabase types are enough and RLS is the security boundary), Redis, a queue, or a monorepo.
 Each of these has an entry point described in Section 11 when the time comes.
+
+### Next 16 notes
+
+Three things differ from Next 15 and will bite anyone working from older examples:
+
+- **`middleware.ts` is now `proxy.ts`**, lives at `src/proxy.ts`, and the exported function must be
+  named `proxy`. It always runs on the Node runtime; the edge runtime is not available there.
+- **Request APIs are async only.** `cookies()`, `headers()`, `params`, and `searchParams` are all
+  Promises. Synchronous access was removed, not deprecated.
+- **Typed route props.** `LayoutProps<'/'>` and `PageProps<'/path'>` are generated globals. Run
+  `npx next typegen` if they go stale.
+
+Next ships its own agent guidance in `node_modules/next/dist/docs/`, re-exported into `AGENTS.md`.
+Read the relevant guide there before writing framework code; it is version-accurate in a way that
+training data is not.
+
+**shadcn/ui:** the registry no longer ships a `form` component. The current pattern is `field`
+(`src/components/ui/field.tsx`) composed with React Hook Form directly. `FieldError` accepts RHF's
+error objects as its `errors` prop.
 
 ---
 
@@ -562,19 +581,28 @@ src/
       client.ts           browser client
       server.ts           server component client
       admin.ts            service role, SERVER ONLY, invites only
-    auth.ts               getCurrentUser, requireRole
+    auth.ts               getCurrentUser, requireUser, requireRole
     permissions.ts        can(user, action, resource)
     entities.ts
+    action-result.ts      the { ok, data } | { ok, error } contract
+    env.ts                validated environment access
     crypto.ts             credential encrypt and decrypt wrappers
     utils.ts
   types/
     database.types.ts     generated: supabase gen types typescript
+  proxy.ts                session refresh and the logged-out gate (Next 16)
+scripts/
+  bootstrap-admin.mjs     creates the first super admin
+  verify-rls.mjs          asserts the policies actually hold
 supabase/
   migrations/             numbered SQL files, never edited after being applied
   seed.sql
 SYSTEM_DESIGN.md
 CHANGELOG.md
 ```
+
+`src/proxy.ts` sits beside `app/`, not inside it. It is a convenience redirect, not the security
+boundary — RLS is. Treat a change there as a UX change, never as an authorisation change.
 
 ### The module contract
 
@@ -618,13 +646,17 @@ RLS is enabled on every table. Policies call helper functions so that a future p
 touches one function instead of forty policies.
 
 ```sql
+-- Note the `status = 'active'` clause. The original design omitted it here,
+-- which left a suspended user with a valid workspace id and therefore read
+-- access to everything. Suspension has to deny at this function or it does not
+-- deny at all.
 create or replace function auth_workspace_id() returns uuid
-language sql stable security definer as $$
-  select workspace_id from profiles where id = auth.uid()
+language sql stable security definer set search_path = public as $$
+  select workspace_id from profiles where id = auth.uid() and status = 'active'
 $$;
 
 create or replace function auth_role() returns user_role
-language sql stable security definer as $$
+language sql stable security definer set search_path = public as $$
   select role from profiles where id = auth.uid() and status = 'active'
 $$;
 
