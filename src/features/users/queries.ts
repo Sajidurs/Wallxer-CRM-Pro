@@ -55,6 +55,30 @@ export async function getUserById(id: string): Promise<UserRow | null> {
   return data ?? null;
 }
 
+export interface UserOption {
+  id: string;
+  name: string;
+}
+
+/**
+ * Active teammates, for owner and assignee pickers.
+ *
+ * Suspended users are excluded: assigning work to an account that every policy
+ * denies is a silent dead end. Existing records keep pointing at them, which is
+ * the whole reason accounts are suspended rather than deleted.
+ */
+export async function listAssignableUsers(): Promise<UserOption[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .eq("status", "active")
+    .order("full_name", { ascending: true });
+
+  return (data ?? []).map((row) => ({ id: row.id, name: row.full_name }));
+}
+
 /**
  * How many active super admins remain. The UI uses this to disable the actions
  * the database would reject anyway, so the user sees a greyed-out button with a

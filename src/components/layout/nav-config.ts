@@ -48,7 +48,6 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/contacts",
         icon: Users,
         resource: "contact",
-        phase: 2,
       },
       {
         title: "Pipeline",

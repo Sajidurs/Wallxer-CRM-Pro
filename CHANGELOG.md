@@ -45,8 +45,8 @@ Update this file at the end of every work session, before you stop.
 ## Current State
 
 **Last updated:** 2026-09-24
-**Phase:** 1 complete. Phase 0 step 10 (deploy) still outstanding.
-**Deployed:** no
+**Phase:** 2 complete. Phases 0, 1, and 2 all done.
+**Deployed:** yes — https://wallxer-crm-pro.vercel.app
 **Supabase project:** `wjtokyywsuummyaumyty`, free tier
 **Repo:** https://github.com/Sajidurs/Wallxer-CRM-Pro, branch `main`
 
@@ -56,16 +56,18 @@ Update this file at the end of every work session, before you stop.
 - Supabase clients for browser, server, and service role.
 - `src/proxy.ts`: session refresh and the logged-out redirect.
 - Login page, protected `(app)` route group, app shell with sidebar, topbar, and user menu.
-- Dashboard shell with placeholder counters. Stub pages for every sidebar route, so nothing 404s.
-- Workspace `Agency` and all five brands seeded. One super admin exists.
+- Dashboard shell with placeholder counters. Stub pages for every unbuilt sidebar route.
+- Users management: add, change role, suspend, reactivate, reset password, own profile.
+- Contacts: list with search and filters, create, edit, soft delete with undo, detail page.
+- Workspace `Agency` and all five brands seeded. Two real users: one super admin, one manager.
 
 ### Modules status
 
 | Module                            | Status               | Notes                                    |
 | --------------------------------- | -------------------- | ---------------------------------------- |
-| Foundation (auth, workspace, RLS) | Done, not deployed   | Only step 10 of Phase 0 remains          |
-| Users management                  | Done, not deployed   | Email-invite path untested, no SMTP      |
-| Contacts                          | Not started          | Phase 2, next up                         |
+| Foundation (auth, workspace, RLS) | Done, deployed       | Complete                                 |
+| Users management                  | Done, deployed       | Email-invite path untested, no SMTP      |
+| Contacts                          | Done, deployed       | CSV import is still Phase 7              |
 | Projects, credentials, files      | Not started          | Phase 3                                  |
 | Tasks                             | Not started          | Phase 4                                  |
 | Pipeline                          | Not started          | Phase 5                                  |
@@ -79,6 +81,7 @@ Update this file at the end of every work session, before you stop.
 | `0001_foundation.sql`  | Yes, 2026-09-24                   |
 | `0002_rls_helpers.sql` | Yes, 2026-09-24                   |
 | `0003_users_management.sql` | Yes, 2026-09-24              |
+| `0004_contacts.sql`    | Yes, 2026-09-24                   |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -104,35 +107,90 @@ Phases 3 and 7.
 
 ## Next Up
 
-**Finish Phase 0.** One step is left:
+**Phase 3, Projects, websites, credentials, and files.** The biggest phase, and the only one with a
+cryptography decision in it.
 
-1. Deploy to Vercel. Import the GitHub repo, add the four runtime environment variables
-   (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `NEXT_PUBLIC_APP_URL` set to the deployed URL), then confirm login works in production.
-   Add the deployed URL to Supabase Auth → URL Configuration → Redirect URLs.
+1. Migration `0005_projects.sql`: `projects`, `project_websites`, the `project_status` enum, RLS,
+   and the standard soft-delete guard from `0004`.
+2. Migration `0006_credentials.sql`: `credentials`, `credential_access_log`, the
+   `credential_category` enum, and the `create_credential` / `reveal_credential` security definer
+   functions from section 7.3.
+3. **Decide the encryption approach first.** Section 7.3 specifies pgsodium with a key in Supabase
+   Vault, and names an application-layer AES-256-GCM fallback in `lib/crypto.ts`. pgsodium has been
+   deprecated in Supabase for new projects, so confirm what is actually available before writing
+   the migration, and record the choice in the Decision Log either way.
+4. `features/projects/` and `features/credentials/` per the module contract.
+5. `features/shared/attachments/` plus the `attachments` table, the two storage buckets, and the
+   upload route handler from section 7.4. This is the first polymorphic subsystem, so it sets the
+   pattern the rest inherit.
+6. Wire the Files and Projects tabs on the contact detail page, which currently say "Phase 3".
+7. Extend `scripts/verify-rls.mjs`: a revealed credential writes an access-log row, a member cannot
+   read `secret_encrypted` directly, and storage policies reject a path outside the workspace.
 
-**Optional but recommended: custom SMTP.** Until it exists, email invites and password-reset emails
-cannot work. Resend's free tier is 3,000 messages a month and needs a verified domain. Set
-`SUPABASE_EMAIL_ENABLED=true` afterwards and test the invite path, which has never been executed.
-
-**Then Phase 2, Contacts.**
-
-1. Migration `0004_contacts.sql`: the `contacts` table from section 5.2, its indexes, the full-text
-   search index, and RLS policies following the standard pattern.
-2. `features/contacts/`: `schema.ts`, `queries.ts`, `actions.ts`, `components/`.
-3. List with server-side pagination, full-text search, and filters on brand, type, owner, tags.
-   This is where TanStack Table earns its place; the users table did not need it.
-4. Detail page with tabs. Only Overview is real in Phase 2; the rest arrive with their modules.
-5. `parent_contact_id` linking a person to a company.
-6. Extend `scripts/verify-rls.mjs`: a member can create and edit a contact but not delete one.
-
-**Definition of done for Phase 0:** a real person can log in on the deployed URL, see an empty
-dashboard shell, and be blocked from every route when logged out.
-_Locally satisfied and verified. Awaiting the deploy._
+**Definition of done for Phase 3:** a project can be created against a client contact, given a
+credential that round-trips through encrypt and reveal with the reveal logged, and given an
+uploaded file that downloads through a signed URL and cannot be fetched without one.
 
 ---
 
 ## Unreleased
+
+### 2026-09-24 — Deployed, and Phase 2, Contacts
+
+**Added**
+
+- **Deployed to Vercel: https://wallxer-crm-pro.vercel.app.** Phase 0 is now complete.
+- Migration `0004_contacts.sql`: the `contacts` table, a generated `search_vector`, seven indexes,
+  a soft-delete guard trigger, and RLS.
+- `features/contacts/` following the module contract, plus `features/brands/queries.ts` and
+  `listAssignableUsers` in `features/users/queries.ts` so contacts never reaches into another
+  feature's internals.
+- `/contacts` with database-side pagination, full-text search, and filters on type, status, brand,
+  owner, and tag. Filter state lives in the URL, so a filtered list is linkable.
+- `/contacts/new`, `/contacts/[id]`, `/contacts/[id]/edit`. The detail page has the tabs from
+  section 8.2; only Overview is real, the rest name the phase that fills them.
+- People link to companies through `parent_contact_id`, and a company lists its people.
+- Delete offers an Undo in the toast, which works because managers can still see deleted rows.
+- `TagInput` and `Pagination` in `components/common/`.
+
+**Changed**
+
+- Supabase Site URL moved from `http://localhost:3000` to the Vercel URL, with both in the redirect
+  allow list so local development still works.
+- `verify-rls.mjs` now covers contacts: 22 checks to 30.
+- `ContactFilters` adjusts search state during render rather than in an effect. The effect version
+  rendered the stale value once and then immediately re-rendered, and failed lint.
+
+**Security**
+
+- No DELETE policy on `contacts` at all. Removal is only ever `deleted_at`, which makes invariant 6
+  of section 0 ("nothing is hard deleted") true at the database rather than by convention.
+- Soft delete is an UPDATE, so the UPDATE policy cannot separate editing from deleting. A trigger
+  does, restricting both delete and restore to manager and above. Verified: a member gets
+  `Only a manager or above can delete a contact`.
+- Deleted rows remain visible to manager and above only. That is what makes Undo and a future trash
+  view possible without the service role.
+- A `contacts_name_present` check constraint rejects a contact with no name, mirrored by a Zod
+  refine so the user sees which field is empty rather than a database error.
+
+**Files touched:** `supabase/migrations/0004_contacts.sql`, `src/features/contacts/**`,
+`src/features/brands/**`, `src/app/(app)/contacts/**`, `src/components/common/**`,
+`src/features/users/queries.ts`, `scripts/verify-rls.mjs`
+
+**Migration:** `supabase/migrations/0004_contacts.sql`, applied to `wjtokyywsuummyaumyty`.
+
+**Notes:**
+
+- Verified: 30/30 RLS checks, 25/25 contacts end-to-end checks, and 13/13 production checks against
+  the live Vercel URL, including that the service role key appears nowhere in served HTML.
+- The design specified an expression index for search. A stored generated `search_vector` column
+  replaced it: PostgREST cannot reproduce an index expression in a query, so the expression index
+  would never have been used. `.textSearch('search_vector', q, { type: 'websearch' })` does.
+- `next typegen` must be re-run after adding a dynamic route, or `PageProps<'/contacts/[id]'>` fails
+  to typecheck against a stale route union. `npm run build` does it; `tsc --noEmit` alone does not.
+- A second real user exists now (Ashik Ahmed, manager), added through the UI. An RLS assertion that
+  hardcoded "exactly one profile" started failing because of it and was loosened to `>= 1` —
+  coupling a security check to headcount makes it fail on hiring.
 
 ### 2026-09-24 — Phase 1, Users management
 
@@ -309,6 +367,12 @@ so nobody relitigates a settled question six months from now.
 | 2026-09-24 | A handed-over password forces a change via `must_change_password`, guarded server-side | A temporary password passed over chat is a shared secret. Making the flag client-writable would put skipping the change one API call away. |
 | 2026-09-24 | Admin-initiated "reset password" issues a new temporary password rather than emailing a link | Same email constraint. It also works identically whether or not SMTP is ever configured, so the recovery path never depends on deliverability. |
 | 2026-09-24 | `/auth/callback` is a client component handling three token shapes | Which shape Supabase sends depends on the flow and the email template, neither of which this app controls. The `#access_token` fragment never reaches a server route handler at all. |
+| 2026-09-24 | A stored generated `search_vector` column instead of the expression index in §5.2 | PostgREST cannot reproduce an index expression in a query, so the expression index would have been built and never used. A generated column is queryable through `.textSearch()` and indexes identically. |
+| 2026-09-24 | `contacts` has no DELETE policy at all | Invariant 6 of §0 is "nothing is hard deleted". Omitting the policy makes that true at the database instead of relying on every future caller remembering to soft delete. |
+| 2026-09-24 | Deleted contacts stay visible to manager and above | Undo after a delete, and a trash view later, both need to read a deleted row. The alternative is a service-role round trip for an everyday action. |
+| 2026-09-24 | A trigger, not the UPDATE policy, restricts soft delete | Deleting is an UPDATE that sets `deleted_at`, so one policy cannot tell "a member fixed a phone number" from "a member deleted the client". Only a trigger can see which column changed. |
+| 2026-09-24 | No TanStack Table for contacts, despite §2 naming it | Sorting, filtering, and pagination all happen in Postgres, so the client table renders rows and nothing more. Adding a table library to render a `<table>` is weight without a job. Revisit if column reordering or row selection is ever wanted. |
+| 2026-09-24 | Filter state lives in the URL | A filtered list becomes linkable and survives a refresh, and it is what lets the server component do the filtering. Component state would mean shipping every contact to the browser. |
 
 ---
 
@@ -325,7 +389,10 @@ than the bug itself.
 | 2026-09-24 | Profile menu and password change were disabled in the user menu.                                                                                              | Low      | Fixed 2026-09-24, `/settings/profile`   |
 | 2026-09-24 | No SMTP. The email-invite path is written but has never been executed, and password-reset-by-email does not exist. Temporary passwords cover both for now.     | Medium   | Open, needs custom SMTP                 |
 | 2026-09-24 | No backups configured. The free tier's are limited, and §10 calls this the one gap that can actually hurt.                                                     | Medium   | Open, needs a weekly `pg_dump` reminder |
-| 2026-09-24 | Not deployed. Phase 0 step 10 is still outstanding, and Supabase's Site URL is still `http://localhost:3000`, which will break invite links in production.     | Medium   | Open, needs the Vercel deploy           |
+| 2026-09-24 | Not deployed, and Supabase's Site URL still pointed at localhost.                                                                                              | Medium   | Fixed 2026-09-24                        |
+| 2026-09-24 | `listUsedTags` reads up to 2,000 contacts to build the tag filter list. Fine now, wrong once the imported lists land. Replace with a distinct-tag view or a tags table when it bites. | Low | Open, revisit in Phase 7 |
+| 2026-09-24 | `listCompanyOptions` caps the "Works at" picker at 500 companies. Beyond that the picker silently omits some; it needs to become a search. | Low | Open, revisit when it matters |
+| 2026-09-24 | Deleted contacts can only be restored via the Undo toast. There is no trash view, so a delete dismissed without undoing needs a manager and a hand-written query. | Low | Open, Phase 7 |
 
 ---
 

@@ -76,8 +76,11 @@ check(
 
 const userProfiles = await user.from("profiles").select("email,role");
 check(
+  // Deliberately `>= 1`, not `=== 1`. Asserting an exact count here couples the
+  // security check to how many teammates happen to exist, so it starts failing
+  // the moment someone is hired. What matters is that the read is permitted.
   "signed-in user reads workspace profiles",
-  userProfiles.data?.length === 1,
+  (userProfiles.data?.length ?? 0) >= 1,
   userProfiles.error?.message ?? `rows: ${userProfiles.data?.length}`,
 );
 
@@ -270,6 +273,108 @@ if (!serviceKey) {
       (memberReadsProfiles.data?.length ?? 0) >= 2,
       memberReadsProfiles.error?.message ??
         `rows: ${memberReadsProfiles.data?.length}`,
+    );
+
+    // --- contacts --------------------------------------------------------
+    const workspaceId = (await member.from("workspaces").select("id")).data[0].id;
+
+    const memberContact = await member
+      .from("contacts")
+      .insert({
+        workspace_id: workspaceId,
+        type: "person",
+        first_name: "RLS",
+        last_name: "Probe",
+        status: "lead",
+      })
+      .select("id")
+      .single();
+    check(
+      "member can create a contact",
+      !memberContact.error,
+      memberContact.error?.message ?? "ok",
+    );
+
+    if (!memberContact.error) {
+      const contactId = memberContact.data.id;
+
+      const edit = await member
+        .from("contacts")
+        .update({ phone: "+880000000000" })
+        .eq("id", contactId);
+      check("member can edit a contact", !edit.error, edit.error?.message ?? "ok");
+
+      // Soft delete is an UPDATE, so the policy alone cannot stop a member.
+      // The trigger has to.
+      const softDelete = await member
+        .from("contacts")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", contactId);
+      check(
+        "member cannot soft-delete a contact",
+        !!softDelete.error,
+        softDelete.error?.message ?? "NO ERROR — members can delete clients",
+      );
+
+      // No DELETE policy exists at all, by design.
+      const hardDelete = await member.from("contacts").delete().eq("id", contactId);
+      const { data: stillThere } = await admin
+        .from("contacts")
+        .select("id")
+        .eq("id", contactId)
+        .maybeSingle();
+      check(
+        "hard delete is impossible for a member",
+        !!stillThere,
+        hardDelete.error?.message ?? "row survived",
+      );
+
+      // The super admin is a manager-or-above, so deletion must work for them.
+      const adminDelete = await user
+        .from("contacts")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", contactId);
+      check(
+        "manager or above can soft-delete a contact",
+        !adminDelete.error,
+        adminDelete.error?.message ?? "ok",
+      );
+
+      // A deleted contact must drop out of a member's view entirely.
+      const memberSees = await member
+        .from("contacts")
+        .select("id")
+        .eq("id", contactId);
+      check(
+        "member cannot see a deleted contact",
+        (memberSees.data?.length ?? 0) === 0,
+        `rows: ${memberSees.data?.length}`,
+      );
+
+      // A manager still can, which is what makes Undo and a trash view work.
+      const adminSees = await user
+        .from("contacts")
+        .select("id")
+        .eq("id", contactId);
+      check(
+        "manager can still see a deleted contact",
+        (adminSees.data?.length ?? 0) === 1,
+        `rows: ${adminSees.data?.length}`,
+      );
+
+      await admin.from("contacts").delete().eq("id", contactId);
+    }
+
+    // The name check constraint is what stops blank rows reaching the UI.
+    const namelessContact = await member.from("contacts").insert({
+      workspace_id: workspaceId,
+      type: "person",
+      status: "lead",
+    });
+    check(
+      "a person with no name is rejected",
+      !!namelessContact.error,
+      namelessContact.error?.message ?? "NO ERROR — blank contacts are allowed",
     );
 
     // Suspension must deny immediately, without deleting anything.

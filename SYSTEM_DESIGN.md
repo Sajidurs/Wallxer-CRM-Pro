@@ -764,6 +764,24 @@ List with server side pagination, full text search, and filters on brand, type, 
 Detail page with tabs: Overview, Deals, Projects, Tasks, Files, Comments, Activity. Person
 contacts can link to a company contact through `parent_contact_id`.
 
+**Search** uses a stored generated `search_vector` column, not the expression index sketched in
+section 5.2. PostgREST cannot reproduce an index expression inside a query, so that index would
+have been built and never used. Query it with
+`.textSearch('search_vector', q, { type: 'websearch', config: 'simple' })`.
+
+**Deletion** is soft, and there is deliberately no DELETE policy on the table — removal only ever
+happens by setting `deleted_at`, which makes invariant 6 of section 0 true at the database rather
+than by convention. Because a soft delete is an UPDATE, the update policy cannot tell it apart from
+an edit; a trigger does that, restricting delete and restore to manager and above. Deleted rows stay
+readable by manager and above, which is what makes the Undo toast work without the service role.
+
+**Filter state lives in the URL.** That keeps a filtered list linkable and, more importantly, keeps
+the filtering in Postgres — component state would mean shipping every contact to the browser.
+
+**TanStack Table is not used here**, despite section 2 listing it. Sorting, filtering, and
+pagination all happen in the database, so the client component renders rows and nothing else.
+Reach for it if column reordering or row selection is ever wanted.
+
 CSV import lands in Phase 7 and matters, given your existing contact lists. Design the import to
 write through the same Zod schema and server action as the manual form, so validation cannot
 diverge.

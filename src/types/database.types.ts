@@ -80,6 +80,126 @@ export type Database = {
           },
         ]
       }
+      contacts: {
+        Row: {
+          address: Json
+          brand_id: string | null
+          company_name: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          email: string | null
+          first_name: string | null
+          id: string
+          job_title: string | null
+          last_name: string | null
+          notes: string | null
+          owner_id: string | null
+          parent_contact_id: string | null
+          phone: string | null
+          search_vector: unknown
+          source: string | null
+          status: string
+          tags: string[]
+          type: Database["public"]["Enums"]["contact_type"]
+          updated_at: string
+          website: string | null
+          whatsapp: string | null
+          workspace_id: string
+        }
+        Insert: {
+          address?: Json
+          brand_id?: string | null
+          company_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          job_title?: string | null
+          last_name?: string | null
+          notes?: string | null
+          owner_id?: string | null
+          parent_contact_id?: string | null
+          phone?: string | null
+          search_vector?: unknown
+          source?: string | null
+          status?: string
+          tags?: string[]
+          type?: Database["public"]["Enums"]["contact_type"]
+          updated_at?: string
+          website?: string | null
+          whatsapp?: string | null
+          workspace_id: string
+        }
+        Update: {
+          address?: Json
+          brand_id?: string | null
+          company_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          job_title?: string | null
+          last_name?: string | null
+          notes?: string | null
+          owner_id?: string | null
+          parent_contact_id?: string | null
+          phone?: string | null
+          search_vector?: unknown
+          source?: string | null
+          status?: string
+          tags?: string[]
+          type?: Database["public"]["Enums"]["contact_type"]
+          updated_at?: string
+          website?: string | null
+          whatsapp?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_parent_contact_id_fkey"
+            columns: ["parent_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -195,6 +315,7 @@ export type Database = {
       touch_last_seen: { Args: never; Returns: undefined }
     }
     Enums: {
+      contact_type: "person" | "company"
       user_role: "super_admin" | "admin" | "manager" | "member"
       user_status: "active" | "invited" | "suspended"
     }
@@ -327,6 +448,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      contact_type: ["person", "company"],
       user_role: ["super_admin", "admin", "manager", "member"],
       user_status: ["active", "invited", "suspended"],
     },
