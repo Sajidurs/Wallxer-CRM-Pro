@@ -708,6 +708,132 @@ if (!serviceKey) {
       await admin.storage.from("project-files").remove([ownPath]);
     }
 
+    // --- tasks -------------------------------------------------------------
+    // Section 4 says a member may edit only tasks assigned to them. Until
+    // 0011 that rule lived solely in lib/permissions.ts, which decides whether
+    // to render a button and stops nothing. These checks are the difference.
+
+    const { data: unassignedTask } = await admin
+      .from("tasks")
+      .insert({
+        workspace_id: workspaceId,
+        title: `RLS probe: not yours ${Date.now()}`,
+        status: "todo",
+        priority: "medium",
+      })
+      .select("id")
+      .single();
+
+    const { data: assignedTask } = await admin
+      .from("tasks")
+      .insert({
+        workspace_id: workspaceId,
+        title: `RLS probe: yours ${Date.now()}`,
+        status: "todo",
+        priority: "medium",
+      })
+      .select("id")
+      .single();
+
+    await admin.from("task_assignees").insert({
+      task_id: assignedTask.id,
+      user_id: memberId,
+      workspace_id: workspaceId,
+    });
+
+    const editNotMine = await member
+      .from("tasks")
+      .update({ title: "hijacked" })
+      .eq("id", unassignedTask.id);
+    check(
+      "member cannot edit a task that is not theirs",
+      !!editNotMine.error,
+      editNotMine.error?.message ?? "NO ERROR — members can edit anything",
+    );
+
+    const editMine = await member
+      .from("tasks")
+      .update({ status: "in_progress" })
+      .eq("id", assignedTask.id);
+    check(
+      "member can edit a task assigned to them",
+      !editMine.error,
+      editMine.error?.message ?? "ok",
+    );
+
+    // The escalation this design has to refuse: assigning yourself someone
+    // else's task would otherwise be a one-step route to editing everything.
+    const selfAssign = await member.from("task_assignees").insert({
+      task_id: unassignedTask.id,
+      user_id: memberId,
+      workspace_id: workspaceId,
+    });
+    check(
+      "member cannot assign themselves another task",
+      !!selfAssign.error,
+      selfAssign.error?.message ?? "NO ERROR — edit rights are self-grantable",
+    );
+
+    const memberDeleteTask = await member
+      .from("tasks")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", assignedTask.id);
+    check(
+      "member cannot delete even their own task",
+      !!memberDeleteTask.error,
+      memberDeleteTask.error?.message ?? "NO ERROR — members can delete tasks",
+    );
+
+    // Positive soft-delete path, the check whose absence hid the attachment bug.
+    const managerDeleteTask = await user
+      .from("tasks")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", assignedTask.id);
+    check(
+      "manager can soft-delete a task",
+      !managerDeleteTask.error,
+      managerDeleteTask.error?.message ?? "ok",
+    );
+
+    const { data: deletedTask } = await admin
+      .from("tasks")
+      .select("deleted_at")
+      .eq("id", assignedTask.id)
+      .single();
+    check(
+      "the task is actually marked deleted",
+      deletedTask?.deleted_at !== null,
+      String(deletedTask?.deleted_at),
+    );
+
+    // completed_at is maintained by the database, not the app.
+    await admin.from("tasks").update({ deleted_at: null }).eq("id", assignedTask.id);
+    await user.from("tasks").update({ status: "done" }).eq("id", assignedTask.id);
+    const { data: doneTask } = await admin
+      .from("tasks")
+      .select("completed_at")
+      .eq("id", assignedTask.id)
+      .single();
+    check(
+      "completing a task stamps completed_at",
+      doneTask?.completed_at !== null,
+      String(doneTask?.completed_at),
+    );
+
+    await user.from("tasks").update({ status: "todo" }).eq("id", assignedTask.id);
+    const { data: reopened } = await admin
+      .from("tasks")
+      .select("completed_at")
+      .eq("id", assignedTask.id)
+      .single();
+    check(
+      "reopening a task clears completed_at",
+      reopened?.completed_at === null,
+      String(reopened?.completed_at),
+    );
+
+    await admin.from("tasks").delete().in("id", [unassignedTask.id, assignedTask.id]);
+
     await admin.from("projects").delete().eq("id", projectId);
 
     // Suspension must deny immediately, without deleting anything.

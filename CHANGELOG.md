@@ -45,7 +45,7 @@ Update this file at the end of every work session, before you stop.
 ## Current State
 
 **Last updated:** 2026-09-24
-**Phase:** 3 complete. Phases 0 through 3 done.
+**Phase:** 4 complete. Phases 0 through 4 done.
 **Deployed:** yes — https://wallxer-crm-pro.vercel.app
 **Supabase project:** `wjtokyywsuummyaumyty`, free tier
 **Repo:** https://github.com/Sajidurs/Wallxer-CRM-Pro, branch `main`
@@ -69,7 +69,7 @@ Update this file at the end of every work session, before you stop.
 | Users management                  | Done, deployed       | Email-invite path untested, no SMTP      |
 | Contacts                          | Done, deployed       | CSV import is still Phase 7              |
 | Projects, credentials, files      | Done                 | Files attach to contacts too             |
-| Tasks                             | Not started          | Phase 4                                  |
+| Tasks                             | Done                 | List and board; calendar view deferred   |
 | Pipeline                          | Not started          | Phase 5                                  |
 | Dashboard                         | Shell only           | Phase 6 builds the real widgets          |
 | Polish and search                 | Not started          | Phase 7                                  |
@@ -88,6 +88,8 @@ Update this file at the end of every work session, before you stop.
 | `0008_attachments.sql` | Yes, 2026-09-24                   |
 | `0009_fix_attachment_soft_delete.sql` | Yes, 2026-09-24 |
 | `0010_attachment_authorship.sql` | Yes, 2026-09-24      |
+| `0011_tasks.sql`       | Yes, 2026-09-24                   |
+| `0012_resource_links.sql` | Yes, 2026-09-24                |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -118,30 +120,102 @@ the application-layer fallback that was not taken. `SENTRY_DSN` is Phase 7.
 
 ## Next Up
 
-**Phase 4, Tasks.**
+**Phase 5, Pipeline.**
 
-1. Migration `0011_tasks.sql`: `tasks`, `task_assignees`, the `task_status` and
-   `task_priority` enums, indexes, RLS, and the soft-delete guard from `0004`.
-2. Migration for `resource_links` (section 5.6) — the named-URL subsystem. Same polymorphic shape
-   as `attachments`, so it follows that pattern rather than inventing a new one.
-3. `features/tasks/` per the module contract.
-4. Views: list grouped by status, board, and calendar by `due_at`. Filters by assignee, project,
-   brand, priority, and due window.
-5. The task form's repeatable links section, backed by `resource_links`, with no fixed limit.
-6. Members may edit only tasks assigned to them — `canEditTask` in `lib/permissions.ts` already
-   encodes this, but nothing enforces it in the database yet. It needs a trigger, the same way
-   soft delete did.
-7. Wire the Tasks tabs on project and contact detail, which currently say "Phase 4".
-8. Extend `scripts/verify-rls.mjs`: a member can edit a task assigned to them and cannot edit one
-   that is not.
+1. Migration `0013_pipeline.sql`: `pipelines`, `pipeline_stages`, `deals`, the `deal_status`
+   enum, and `deal_stage_history` from section 5.3.
+2. `deal_stage_history` is written by a trigger on `stage_id` change, not by the app, so it
+   cannot be skipped by a future code path.
+3. **Apply the soft-delete rule from 0009** to `deals`: whoever may set `deleted_at` must still
+   satisfy the SELECT policy afterwards, or deletion is impossible for everyone.
+4. `features/pipeline/` per the module contract.
+5. Kanban board, columns from `pipeline_stages`, drag and drop with optimistic updates. The board
+   in `features/tasks/components/task-board.tsx` already does midpoint ordering with the HTML5
+   drag API; follow it rather than adding a library.
+6. A deal is created by picking an existing contact, per section 8.3.
+7. Multiple pipelines from day one — different brands sell differently.
+8. `amount` and `currency` exist in the schema and stay hidden behind
+   `settings.pipeline.show_values`, which is already `false` in the seeded workspace.
+9. `/settings/pipelines`, currently a stub, becomes stage administration: rename, reorder,
+   archive, without a deploy.
+10. Wire the Deals tab on contact detail, which currently says "Phase 5".
+11. Extend `scripts/verify-rls.mjs`: moving a deal writes exactly one history row, and a member
+    cannot delete a deal.
 
-**Definition of done for Phase 4:** a task can be created against a project, assigned to a
-teammate, given a recorded-video link, moved across the board, and a member cannot edit a task that
-is not theirs.
+**Definition of done for Phase 5:** a deal can be raised against a contact, dragged between stages
+with the move recorded in `deal_stage_history`, and won or lost.
 
 ---
 
 ## Unreleased
+
+### 2026-09-25 — Phase 4, Tasks
+
+**Added**
+
+- Migration `0011_tasks.sql`: `tasks` and `task_assignees`, the `task_status` and `task_priority`
+  enums, indexes including one for board ordering, RLS, and two triggers.
+- Migration `0012_resource_links.sql`: the `resource_links` polymorphic subsystem, shaped
+  deliberately like `attachments` rather than inventing a second pattern.
+- `features/tasks/` and `features/shared/resource-links/` per the module contract.
+- `/tasks` with a **list** and a **board** view, sharing one set of URL filters: search, due window
+  (overdue, today, next 7 days, none), status, priority, assignee, project, plus a "My tasks"
+  toggle.
+- `/tasks/new`, `/tasks/[id]`, `/tasks/[id]/edit`.
+- The repeatable links section from section 8.5: name, URL, and kind, with "add another" and no
+  fixed limit. `kind: 'video'` carries the recorded walkthrough the design asks for.
+- Drag and drop on the board, with optimistic movement and midpoint ordering so one row is written
+  per drop rather than renumbering a column.
+- Real Tasks tabs on project and contact detail, replacing the "Phase 4" placeholders.
+
+**Security**
+
+- **A member can now only edit tasks assigned to them, enforced by the database.** Until this,
+  section 4's rule lived solely in `lib/permissions.ts`, which decides whether to render a button
+  and stops nothing — a member could have PATCHed any task directly.
+- Assignment is restricted in step with editing. A member who could assign themselves any task
+  would have had a one-step route to editing everything, so `task_assignees` insert and delete are
+  manager-only except on a task you created. Verified.
+- Deleting a task is manager-only, including your own.
+
+**Changed**
+
+- `completed_at` is maintained by a database trigger, not the app, so it cannot drift from `status`.
+  Phase 6's dashboard depends on it being true.
+- `nav-config.ts`: Projects and Tasks no longer carry "phase" markers.
+- `scripts/verify-rls.mjs`: 53 checks to 61. `scripts/verify-schemas.ts`: 12 schemas to 20.
+
+**Fixed**
+
+- `taskSchema.estimatedMinutes` rejected the field being absent entirely. In Zod 4 a union
+  containing `z.undefined()` still requires the key to be present; `.optional()` on the union is
+  what actually makes it optional. Caught by the idempotence check, before it reached the UI.
+- `updateTask` ignored the links the form submits, so editing a task silently discarded link
+  changes. Links are now replaced wholesale on save.
+
+**Files touched:** `supabase/migrations/0011_tasks.sql`, `supabase/migrations/0012_resource_links.sql`,
+`src/features/tasks/**`, `src/features/shared/resource-links/**`, `src/app/(app)/tasks/**`,
+`src/app/(app)/projects/[id]/page.tsx`, `src/app/(app)/contacts/[id]/page.tsx`,
+`src/components/layout/nav-config.ts`, `scripts/verify-rls.mjs`, `scripts/verify-schemas.ts`
+
+**Migration:** `0011_tasks.sql`, `0012_resource_links.sql`. Both applied to `wjtokyywsuummyaumyty`.
+
+**Notes:**
+
+- Verified: 61/61 RLS checks, 20/20 schema idempotence, 20/20 end-to-end over HTTP.
+- **The soft-delete rule from `0009` was applied at the point it would otherwise have repeated.**
+  The tasks SELECT policy ends in `or is_manager()` because deletion is manager-only, so the row an
+  UPDATE produces still satisfies the policy. Carry this to `deals` in Phase 5.
+- **The calendar view from section 8.5 is not built.** List and board are; a month grid is a
+  different component with its own navigation, and the due-window filters cover the question
+  "what is coming up" that the calendar was mostly there to answer. Recorded as a Known Issue
+  rather than quietly dropped.
+- The board uses the HTML5 drag API rather than a drag-and-drop library. Five columns and one card
+  at a time do not justify the dependency; reach for one when multi-select or nested sorting
+  arrives.
+- Sorting by priority happens in JavaScript after the page is fetched, because `task_priority` is
+  an enum and Postgres orders enums by declaration, not by weight. That is correct within a page
+  and wrong across pages — a `priority_weight` column would fix it properly if it ever matters.
 
 ### 2026-09-24 — Fix: deleting a file was impossible, and attachment authorship was forgeable
 
@@ -561,6 +635,11 @@ so nobody relitigates a settled question six months from now.
 | 2026-09-24 | Credential add and edit are two form components, not one | Creating requires a secret and editing must not, because the edit form never shows the stored value — requiring it would force a reveal, logged as an access that never needed to happen, just to fix a label. One `useForm` covering both only typechecked with `as never`. |
 | 2026-09-24 | A soft-deletable table's SELECT policy must keep the deleted row visible to whoever may delete it | Postgres checks the row an UPDATE produces against the SELECT policy. A policy ending in a bare `deleted_at is null` rejects its own soft delete, which is how file deletion shipped broken for every user. |
 | 2026-09-24 | `created_by` on attachments is constrained on insert and immutable after | The right to delete your own file is derived from it. A column the user can set freely cannot carry a permission. |
+| 2026-09-25 | Task assignment is restricted in step with task editing | A member may edit tasks assigned to them. If assignment were open, assigning yourself any task would be a one-step route to editing everything — the permission would grant itself. |
+| 2026-09-25 | `completed_at` is set by a trigger, not the app | It must not drift from `status`, and Phase 6's dashboard counts depend on it. A write that bypasses the app still leaves an honest timestamp. |
+| 2026-09-25 | The board uses the HTML5 drag API, not a drag-and-drop library | Five columns, one card at a time. A library would be more code and another dependency for behaviour the platform already has. Revisit for multi-select or nested sorting. |
+| 2026-09-25 | Task list and board share one set of URL filters | The view is how the same results are drawn, not which results they are. Clearing filters therefore keeps the view. |
+| 2026-09-25 | The calendar view from §8.5 is deferred, not dropped | A month grid is a separate component with its own navigation, and the due-window filters answer "what is coming up", which is most of what the calendar was for. Recorded as a Known Issue. |
 | 2026-09-24 | Upload is a route handler, not a server action | Server actions serialise arguments through the RSC protocol, which is a poor fit for a 25 MB binary. The route streams straight to storage. |
 
 ---
@@ -579,6 +658,9 @@ than the bug itself.
 | 2026-09-24 | `signOut()` uses Supabase's default global scope, so signing out on one device ends every session for that user. Change to `{ scope: 'local' }` if that is not wanted. | Low | Open, needs a decision |
 | 2026-09-24 | Deleting an attachment leaves the object in the bucket by design. Nothing sweeps them, so storage use only grows. Add a periodic purge of objects whose rows have been deleted for 30+ days. | Low | Open, revisit before storage fills |
 | 2026-09-24 | Credential key rotation is unimplemented. Rotating it means re-encrypting every row, and there is no script for that. | Low | Open, write it before it is needed |
+| 2026-09-25 | The task calendar view from §8.5 is not built. List, board, and due-window filters cover the same ground for now. | Low | Open, deferred |
+| 2026-09-25 | Priority sorting happens in JavaScript after fetching a page, because `task_priority` is an enum and Postgres orders enums by declaration. Correct within a page, wrong across pages. Needs a `priority_weight` column if it matters. | Low | Open |
+| 2026-09-25 | v1 assigns one person per task. The junction table supports many, and the UI does not. | Low | Open, by design |
 | 2026-09-24 | No SMTP. The email-invite path is written but has never been executed, and password-reset-by-email does not exist. Temporary passwords cover both for now.     | Medium   | Open, needs custom SMTP                 |
 | 2026-09-24 | No backups configured. The free tier's are limited, and §10 calls this the one gap that can actually hurt.                                                     | Medium   | Open, needs a weekly `pg_dump` reminder |
 | 2026-09-24 | Not deployed, and Supabase's Site URL still pointed at localhost.                                                                                              | Medium   | Fixed 2026-09-24                        |

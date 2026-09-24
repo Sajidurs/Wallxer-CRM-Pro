@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { EmptyState } from "@/components/common/empty-state";
+import { EntityTaskList } from "@/features/tasks/components/entity-task-list";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { getProject, listProjectWebsites } from "@/features/projects/queries";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/features/projects/schema";
 import { AttachmentsPanel } from "@/features/shared/attachments/components/attachments-panel";
 import { listAttachments } from "@/features/shared/attachments/queries";
+import { listTasksFor } from "@/features/tasks/queries";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -61,6 +62,8 @@ export default async function ProjectDetailPage(
       project.contact_id ? getContact(project.contact_id) : Promise.resolve(null),
       listAttachments("project", project.id),
     ]);
+
+  const tasks = await listTasksFor("project_id", project.id);
 
   const reveals = await lastRevealsByCredential(credentials.map((c) => c.id));
   const ownerById = new Map(owners.map((o) => [o.id, o.name]));
@@ -130,7 +133,7 @@ export default async function ProjectDetailPage(
             Credentials ({credentials.length})
           </TabsTrigger>
           <TabsTrigger value="files">Files ({attachments.length})</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks ({tasks.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -235,9 +238,11 @@ export default async function ProjectDetailPage(
         </TabsContent>
 
         <TabsContent value="tasks" className="mt-4">
-          <EmptyState
-            title="Tasks arrive in Phase 4"
-            description="Work items for this project will appear here once the tasks module exists."
+          <EntityTaskList
+            tasks={tasks}
+            people={Object.fromEntries(ownerById)}
+            newTaskHref={`/tasks/new?projectId=${project.id}`}
+            emptyDescription="Work items for this project. They also show on the main Tasks board."
           />
         </TabsContent>
       </Tabs>

@@ -30,6 +30,17 @@ import {
   updateContactSchema,
 } from "../src/features/contacts/schema";
 import {
+  draftLinkSchema,
+  resourceLinkSchema,
+} from "../src/features/shared/resource-links/schema";
+import {
+  deleteTaskSchema,
+  moveTaskSchema,
+  taskFiltersSchema,
+  taskSchema,
+  updateTaskSchema,
+} from "../src/features/tasks/schema";
+import {
   changeRoleSchema,
   inviteUserSchema,
   resetPasswordSchema,
@@ -148,6 +159,73 @@ const cases: Case[] = [
     name: "deleteContactSchema",
     schema: deleteContactSchema,
     input: { id: UUID, deleted: true },
+  },
+  {
+    name: "taskSchema (every optional blank)",
+    schema: taskSchema,
+    input: {
+      title: "Probe task",
+      description: "",
+      status: "todo",
+      priority: "medium",
+      projectId: null,
+      contactId: null,
+      assigneeId: null,
+      startAt: "",
+      dueAt: "",
+      estimatedMinutes: "",
+      links: [],
+    },
+  },
+  {
+    name: "taskSchema (with links and an estimate)",
+    schema: taskSchema,
+    input: {
+      title: "Probe task with links",
+      status: "in_progress",
+      priority: "urgent",
+      estimatedMinutes: "90",
+      links: [{ kind: "video", name: "Walkthrough", url: "loom.com/share/abc" }],
+    },
+  },
+  {
+    name: "updateTaskSchema",
+    schema: updateTaskSchema,
+    input: {
+      id: UUID,
+      values: { title: "Probe", status: "todo", priority: "low", links: [] },
+    },
+  },
+  {
+    name: "deleteTaskSchema",
+    schema: deleteTaskSchema,
+    input: { id: UUID, deleted: true },
+  },
+  {
+    name: "moveTaskSchema",
+    schema: moveTaskSchema,
+    input: { id: UUID, status: "review", position: 1500 },
+  },
+  {
+    name: "taskFiltersSchema",
+    schema: taskFiltersSchema,
+    input: { q: "probe", view: "board", page: "3" },
+  },
+  {
+    name: "resourceLinkSchema (scheme added)",
+    schema: resourceLinkSchema,
+    input: {
+      entityType: "task",
+      entityId: UUID,
+      kind: "document",
+      name: "Spec",
+      url: "docs.google.com/spec",
+    },
+  },
+  {
+    name: "draftLinkSchema",
+    schema: draftLinkSchema,
+    input: { kind: "reference", name: "Ref", url: "https://example.com/x" },
   },
   {
     name: "contactFiltersSchema",

@@ -41,6 +41,8 @@ import { listProjectsForContact } from "@/features/projects/queries";
 import { PROJECT_STATUS_LABELS } from "@/features/projects/schema";
 import { AttachmentsPanel } from "@/features/shared/attachments/components/attachments-panel";
 import { listAttachments } from "@/features/shared/attachments/queries";
+import { EntityTaskList } from "@/features/tasks/components/entity-task-list";
+import { listTasksFor } from "@/features/tasks/queries";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -56,7 +58,6 @@ export async function generateMetadata(
 /** Tabs that exist in the design but whose modules have not been built. */
 const PENDING_TABS = [
   { value: "deals", label: "Deals", phase: 5 },
-  { value: "tasks", label: "Tasks", phase: 4 },
   { value: "activity", label: "Activity", phase: 7 },
 ];
 
@@ -93,6 +94,8 @@ export default async function ContactDetailPage(
     listProjectsForContact(id),
     listAttachments("contact", id),
   ]);
+
+  const tasks = await listTasksFor("contact_id", id);
 
   if (!contact) notFound();
 
@@ -164,8 +167,18 @@ export default async function ContactDetailPage(
         <TabsList className="flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="projects">Projects ({projects.length})</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks ({tasks.length})</TabsTrigger>
           <TabsTrigger value="files">Files ({attachments.length})</TabsTrigger>
-          <TabsContent value="files" className="mt-4">
+          <TabsContent value="tasks" className="mt-4">
+          <EntityTaskList
+            tasks={tasks}
+            people={Object.fromEntries(owners.map((o) => [o.id, o.name]))}
+            newTaskHref={`/tasks/new?contactId=${contact.id}`}
+            emptyDescription="Work items for this contact, whether or not they belong to a project."
+          />
+        </TabsContent>
+
+        <TabsContent value="files" className="mt-4">
           <AttachmentsPanel
             entityType="contact"
             entityId={contact.id}

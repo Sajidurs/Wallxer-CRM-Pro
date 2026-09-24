@@ -624,6 +624,221 @@ export type Database = {
           },
         ]
       }
+      resource_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          kind: Database["public"]["Enums"]["link_kind"]
+          name: string
+          position: number
+          updated_at: string
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          kind?: Database["public"]["Enums"]["link_kind"]
+          name: string
+          position?: number
+          updated_at?: string
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["link_kind"]
+          name?: string
+          position?: number
+          updated_at?: string
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_links_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_assignees: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          task_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          task_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          task_id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_assignees_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignees_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignees_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignees_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          actual_minutes: number | null
+          completed_at: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          description: string | null
+          due_at: string | null
+          estimated_minutes: number | null
+          id: string
+          parent_task_id: string | null
+          position: number
+          priority: Database["public"]["Enums"]["task_priority"]
+          project_id: string | null
+          start_at: string | null
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          actual_minutes?: number | null
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          description?: string | null
+          due_at?: string | null
+          estimated_minutes?: number | null
+          id?: string
+          parent_task_id?: string | null
+          position?: number
+          priority?: Database["public"]["Enums"]["task_priority"]
+          project_id?: string | null
+          start_at?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          actual_minutes?: number | null
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          description?: string | null
+          due_at?: string | null
+          estimated_minutes?: number | null
+          id?: string
+          parent_task_id?: string | null
+          position?: number
+          priority?: Database["public"]["Enums"]["task_priority"]
+          project_id?: string | null
+          start_at?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string
@@ -717,12 +932,15 @@ export type Database = {
         | "analytics"
         | "social"
         | "other"
+      link_kind: "video" | "document" | "design" | "repository" | "reference"
       project_status:
         | "planning"
         | "active"
         | "on_hold"
         | "completed"
         | "cancelled"
+      task_priority: "low" | "medium" | "high" | "urgent"
+      task_status: "todo" | "in_progress" | "review" | "blocked" | "done"
       user_role: "super_admin" | "admin" | "manager" | "member"
       user_status: "active" | "invited" | "suspended"
     }
@@ -867,6 +1085,7 @@ export const Constants = {
         "social",
         "other",
       ],
+      link_kind: ["video", "document", "design", "repository", "reference"],
       project_status: [
         "planning",
         "active",
@@ -874,6 +1093,8 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      task_priority: ["low", "medium", "high", "urgent"],
+      task_status: ["todo", "in_progress", "review", "blocked", "done"],
       user_role: ["super_admin", "admin", "manager", "member"],
       user_status: ["active", "invited", "suspended"],
     },
