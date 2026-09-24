@@ -39,6 +39,8 @@ import {
 } from "@/features/contacts/schema";
 import { listProjectsForContact } from "@/features/projects/queries";
 import { PROJECT_STATUS_LABELS } from "@/features/projects/schema";
+import { AttachmentsPanel } from "@/features/shared/attachments/components/attachments-panel";
+import { listAttachments } from "@/features/shared/attachments/queries";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -55,7 +57,6 @@ export async function generateMetadata(
 const PENDING_TABS = [
   { value: "deals", label: "Deals", phase: 5 },
   { value: "tasks", label: "Tasks", phase: 4 },
-  { value: "files", label: "Files", phase: 3 },
   { value: "activity", label: "Activity", phase: 7 },
 ];
 
@@ -85,11 +86,12 @@ export default async function ContactDetailPage(
   const actor = await requireUser();
   const { id } = await props.params;
 
-  const [contact, brands, owners, projects] = await Promise.all([
+  const [contact, brands, owners, projects, attachments] = await Promise.all([
     getContact(id),
     listBrandOptions(),
     listAssignableUsers(),
     listProjectsForContact(id),
+    listAttachments("contact", id),
   ]);
 
   if (!contact) notFound();
@@ -162,7 +164,19 @@ export default async function ContactDetailPage(
         <TabsList className="flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="projects">Projects ({projects.length})</TabsTrigger>
-          {PENDING_TABS.map((tab) => (
+          <TabsTrigger value="files">Files ({attachments.length})</TabsTrigger>
+          <TabsContent value="files" className="mt-4">
+          <AttachmentsPanel
+            entityType="contact"
+            entityId={contact.id}
+            attachments={attachments}
+            uploaderNames={Object.fromEntries(owners.map((o) => [o.id, o.name]))}
+            currentUserId={actor.id}
+            canManage={can(actor, "update", "contact")}
+          />
+        </TabsContent>
+
+        {PENDING_TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
             </TabsTrigger>

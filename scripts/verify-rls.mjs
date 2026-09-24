@@ -535,6 +535,96 @@ if (!serviceKey) {
       await admin.from("credentials").delete().eq("id", credentialId);
     }
 
+    // --- attachments and storage -----------------------------------------
+    const otherWorkspaceId = "00000000-0000-0000-0000-0000000000ff";
+
+    // The storage policy matches on the first path segment being the caller's
+    // workspace. This is what stops a valid user reading another workspace's
+    // files by guessing an object name.
+    const foreignUpload = await member.storage
+      .from("project-files")
+      .upload(
+        `${otherWorkspaceId}/project/${projectId}/probe.txt`,
+        new Blob(["nope"], { type: "text/plain" }),
+      );
+    check(
+      "cannot upload outside your own workspace prefix",
+      !!foreignUpload.error,
+      foreignUpload.error?.message ?? "NO ERROR — workspace isolation is broken",
+    );
+
+    const ownPath = `${workspaceId}/project/${projectId}/probe-${Date.now()}.txt`;
+    const ownUpload = await member.storage
+      .from("project-files")
+      .upload(ownPath, new Blob(["hello"], { type: "text/plain" }));
+    check(
+      "can upload inside your own workspace prefix",
+      !ownUpload.error,
+      ownUpload.error?.message ?? "ok",
+    );
+
+    if (!ownUpload.error) {
+      const attachmentInsert = await member
+        .from("attachments")
+        .insert({
+          workspace_id: workspaceId,
+          entity_type: "project",
+          entity_id: projectId,
+          bucket: "project-files",
+          storage_path: ownPath,
+          file_name: "probe.txt",
+          mime_type: "text/plain",
+          size_bytes: 5,
+        })
+        .select("id")
+        .single();
+      check(
+        "member can record an attachment",
+        !attachmentInsert.error,
+        attachmentInsert.error?.message ?? "ok",
+      );
+
+      if (!attachmentInsert.error) {
+        const attachmentId = attachmentInsert.data.id;
+
+        // An attachment must not be repointed at a different object: that would
+        // let someone swap a file's contents while keeping its name and history.
+        const repoint = await member
+          .from("attachments")
+          .update({ storage_path: `${workspaceId}/project/${projectId}/other.txt` })
+          .eq("id", attachmentId);
+        check(
+          "an attachment cannot be repointed at another file",
+          !!repoint.error,
+          repoint.error?.message ?? "NO ERROR — file contents are swappable",
+        );
+
+        // Anonymous access must be refused even with the exact object path.
+        const anonDownload = await anon.storage
+          .from("project-files")
+          .download(ownPath);
+        check(
+          "anon cannot download a stored file",
+          !!anonDownload.error,
+          anonDownload.error?.message ?? "NO ERROR — files are public",
+        );
+
+        // A signed URL is the only way in, and it expires.
+        const signed = await member.storage
+          .from("project-files")
+          .createSignedUrl(ownPath, 60);
+        check(
+          "a signed URL can be issued",
+          !signed.error && !!signed.data?.signedUrl,
+          signed.error?.message ?? "ok",
+        );
+
+        await admin.from("attachments").delete().eq("id", attachmentId);
+      }
+
+      await admin.storage.from("project-files").remove([ownPath]);
+    }
+
     await admin.from("projects").delete().eq("id", projectId);
 
     // Suspension must deny immediately, without deleting anything.

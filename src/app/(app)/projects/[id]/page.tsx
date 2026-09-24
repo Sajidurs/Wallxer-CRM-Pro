@@ -21,6 +21,8 @@ import {
 import { WebsitesPanel } from "@/features/projects/components/websites-panel";
 import { getProject, listProjectWebsites } from "@/features/projects/queries";
 import { PROJECT_STATUS_LABELS, type ProjectStatus } from "@/features/projects/schema";
+import { AttachmentsPanel } from "@/features/shared/attachments/components/attachments-panel";
+import { listAttachments } from "@/features/shared/attachments/queries";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -50,13 +52,15 @@ export default async function ProjectDetailPage(
   const project = await getProject(id);
   if (!project) notFound();
 
-  const [websites, credentials, brands, owners, client] = await Promise.all([
-    listProjectWebsites(project.id),
-    listProjectCredentials(project.id),
-    listBrandOptions(),
-    listAssignableUsers(),
-    project.contact_id ? getContact(project.contact_id) : Promise.resolve(null),
-  ]);
+  const [websites, credentials, brands, owners, client, attachments] =
+    await Promise.all([
+      listProjectWebsites(project.id),
+      listProjectCredentials(project.id),
+      listBrandOptions(),
+      listAssignableUsers(),
+      project.contact_id ? getContact(project.contact_id) : Promise.resolve(null),
+      listAttachments("project", project.id),
+    ]);
 
   const reveals = await lastRevealsByCredential(credentials.map((c) => c.id));
   const ownerById = new Map(owners.map((o) => [o.id, o.name]));
@@ -125,7 +129,7 @@ export default async function ProjectDetailPage(
           <TabsTrigger value="credentials">
             Credentials ({credentials.length})
           </TabsTrigger>
-          <TabsTrigger value="files">Files</TabsTrigger>
+          <TabsTrigger value="files">Files ({attachments.length})</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
         </TabsList>
 
@@ -220,9 +224,13 @@ export default async function ProjectDetailPage(
         </TabsContent>
 
         <TabsContent value="files" className="mt-4">
-          <EmptyState
-            title="File uploads arrive later in Phase 3"
-            description="Contracts, designs, and documents will attach here, and to contacts and tasks, through the shared attachments subsystem."
+          <AttachmentsPanel
+            entityType="project"
+            entityId={project.id}
+            attachments={attachments}
+            uploaderNames={Object.fromEntries(ownerById)}
+            currentUserId={actor.id}
+            canManage={can(actor, "update", "project")}
           />
         </TabsContent>
 

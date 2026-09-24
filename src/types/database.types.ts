@@ -39,6 +39,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      attachments: {
+        Row: {
+          bucket: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          entity_id: string
+          entity_type: string
+          file_name: string
+          id: string
+          mime_type: string | null
+          size_bytes: number | null
+          storage_path: string
+          workspace_id: string
+        }
+        Insert: {
+          bucket?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          entity_id: string
+          entity_type: string
+          file_name: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path: string
+          workspace_id: string
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          file_name?: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attachments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           color: string

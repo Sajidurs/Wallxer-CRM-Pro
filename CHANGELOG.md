@@ -45,7 +45,7 @@ Update this file at the end of every work session, before you stop.
 ## Current State
 
 **Last updated:** 2026-09-24
-**Phase:** 2 complete. Phases 0, 1, and 2 all done.
+**Phase:** 3 complete. Phases 0 through 3 done.
 **Deployed:** yes — https://wallxer-crm-pro.vercel.app
 **Supabase project:** `wjtokyywsuummyaumyty`, free tier
 **Repo:** https://github.com/Sajidurs/Wallxer-CRM-Pro, branch `main`
@@ -68,7 +68,7 @@ Update this file at the end of every work session, before you stop.
 | Foundation (auth, workspace, RLS) | Done, deployed       | Complete                                 |
 | Users management                  | Done, deployed       | Email-invite path untested, no SMTP      |
 | Contacts                          | Done, deployed       | CSV import is still Phase 7              |
-| Projects, credentials, files      | Not started          | Phase 3                                  |
+| Projects, credentials, files      | Done                 | Files attach to contacts too             |
 | Tasks                             | Not started          | Phase 4                                  |
 | Pipeline                          | Not started          | Phase 5                                  |
 | Dashboard                         | Shell only           | Phase 6 builds the real widgets          |
@@ -82,6 +82,10 @@ Update this file at the end of every work session, before you stop.
 | `0002_rls_helpers.sql` | Yes, 2026-09-24                   |
 | `0003_users_management.sql` | Yes, 2026-09-24              |
 | `0004_contacts.sql`    | Yes, 2026-09-24                   |
+| `0005_projects.sql`    | Yes, 2026-09-24                   |
+| `0006_credentials.sql` | Yes, 2026-09-24                   |
+| `0007_credentials_search_path_fix.sql` | Yes, 2026-09-24  |
+| `0008_attachments.sql` | Yes, 2026-09-24                   |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -90,8 +94,11 @@ Set in `.env.local`, which is gitignored. `.env.example` lists them with no valu
 
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `NEXT_PUBLIC_APP_URL`, plus `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`, and
-`SUPABASE_ACCESS_TOKEN` for the CLI. `CREDENTIAL_ENCRYPTION_KEY` and `SENTRY_DSN` are empty until
-Phases 3 and 7.
+`SUPABASE_ACCESS_TOKEN` for the CLI, and `SUPABASE_EMAIL_ENABLED`.
+
+`CREDENTIAL_ENCRYPTION_KEY` is **unused and stays empty**. Credentials are encrypted inside the
+database with a key held in Supabase Vault, not in application code, so that variable belongs to
+the application-layer fallback that was not taken. `SENTRY_DSN` is Phase 7.
 
 ### Useful commands
 
@@ -103,38 +110,118 @@ Phases 3 and 7.
 | `npm run bootstrap:admin`  | Creates or promotes a super admin                        |
 | `npm run verify:rls`       | Asserts the policies hold. Needs `CHECK_EMAIL` and `CHECK_PASSWORD` |
 | `npm run verify:schemas`   | Asserts every Zod schema is idempotent. Run after touching one     |
+| `curl <url>/api/health`    | Says which commit is actually deployed                             |
 
 ---
 
 ## Next Up
 
-**Phase 3, Projects, websites, credentials, and files.** The biggest phase, and the only one with a
-cryptography decision in it.
+**Phase 4, Tasks.**
 
-1. Migration `0005_projects.sql`: `projects`, `project_websites`, the `project_status` enum, RLS,
-   and the standard soft-delete guard from `0004`.
-2. Migration `0006_credentials.sql`: `credentials`, `credential_access_log`, the
-   `credential_category` enum, and the `create_credential` / `reveal_credential` security definer
-   functions from section 7.3.
-3. **Decide the encryption approach first.** Section 7.3 specifies pgsodium with a key in Supabase
-   Vault, and names an application-layer AES-256-GCM fallback in `lib/crypto.ts`. pgsodium has been
-   deprecated in Supabase for new projects, so confirm what is actually available before writing
-   the migration, and record the choice in the Decision Log either way.
-4. `features/projects/` and `features/credentials/` per the module contract.
-5. `features/shared/attachments/` plus the `attachments` table, the two storage buckets, and the
-   upload route handler from section 7.4. This is the first polymorphic subsystem, so it sets the
-   pattern the rest inherit.
-6. Wire the Files and Projects tabs on the contact detail page, which currently say "Phase 3".
-7. Extend `scripts/verify-rls.mjs`: a revealed credential writes an access-log row, a member cannot
-   read `secret_encrypted` directly, and storage policies reject a path outside the workspace.
+1. Migration `0009_tasks.sql`: `tasks`, `task_assignees`, the `task_status` and
+   `task_priority` enums, indexes, RLS, and the soft-delete guard from `0004`.
+2. Migration for `resource_links` (section 5.6) — the named-URL subsystem. Same polymorphic shape
+   as `attachments`, so it follows that pattern rather than inventing a new one.
+3. `features/tasks/` per the module contract.
+4. Views: list grouped by status, board, and calendar by `due_at`. Filters by assignee, project,
+   brand, priority, and due window.
+5. The task form's repeatable links section, backed by `resource_links`, with no fixed limit.
+6. Members may edit only tasks assigned to them — `canEditTask` in `lib/permissions.ts` already
+   encodes this, but nothing enforces it in the database yet. It needs a trigger, the same way
+   soft delete did.
+7. Wire the Tasks tabs on project and contact detail, which currently say "Phase 4".
+8. Extend `scripts/verify-rls.mjs`: a member can edit a task assigned to them and cannot edit one
+   that is not.
 
-**Definition of done for Phase 3:** a project can be created against a client contact, given a
-credential that round-trips through encrypt and reveal with the reveal logged, and given an
-uploaded file that downloads through a signed URL and cannot be fetched without one.
+**Definition of done for Phase 4:** a task can be created against a project, assigned to a
+teammate, given a recorded-video link, moved across the board, and a member cannot edit a task that
+is not theirs.
 
 ---
 
 ## Unreleased
+
+### 2026-09-24 — Phase 3, Projects, credentials, and files
+
+**Added**
+
+- Migration `0005_projects.sql`: `projects` and `project_websites`, the `project_status` enum, a
+  unique project code per workspace, a check that a due date cannot precede a start date, RLS, and
+  the soft-delete guard.
+- Migration `0006_credentials.sql`: `credentials`, `credential_access_log`, and the
+  `create_credential` / `update_credential` / `reveal_credential` / `delete_credential` security
+  definer functions.
+- Migration `0008_attachments.sql`: the polymorphic `attachments` table, both private storage
+  buckets, and storage policies keyed on the workspace path prefix.
+- `features/projects/`, `features/credentials/`, and `features/shared/attachments/` per the module
+  contract.
+- `/projects` with search, filters, and pagination; `/projects/new`, `/projects/[id]`,
+  `/projects/[id]/edit`. The detail page has Overview, Websites, Credentials, Files, and Tasks.
+- `POST /api/upload`: the first route handler. Permission, then size, then MIME, then the object,
+  then the row.
+- Files tabs on both projects and contacts, from the same `AttachmentsPanel`. Adding `'invoice'` to
+  `ENTITY_TYPES` would give invoices file uploads with no migration — the polymorphic design paying
+  out for the first time.
+- The Projects tab on a contact is live, with a "New project" link that pre-selects the client.
+
+**Changed**
+
+- `lib/permissions.ts`: credential `delete` is `manager`, not `admin`, matching what
+  `delete_credential` actually enforces. A manager can already delete the project a credential hangs
+  off, so the stricter UI only disagreed with the boundary.
+
+**Security**
+
+- **pgsodium, which section 7.3 specifies, is deprecated by Supabase and not installed.** Verified
+  what was actually available before choosing: pgcrypto and Vault 0.3 are both installed, so
+  encryption stayed in the database as designed rather than moving into application code.
+- The encryption key is generated randomly *inside* the database by the migration and stored in
+  Vault. It is never written to a file, an environment variable, or the repo, so there is no copy to
+  leak, and a `pg_dump` contains ciphertext with nothing that decrypts it. `credential_key()` is
+  callable by neither `authenticated` nor `anon`.
+- `reveal_credential` writes the access-log row **before** returning plaintext, in the same
+  transaction. A reveal that succeeds is always a reveal that was recorded.
+- `credentials` has no INSERT, UPDATE, or DELETE policy. Writes happen only through the security
+  definer functions, so a direct insert cannot skip the encryption or the log. The ciphertext
+  columns are excluded from the column grants, so a client cannot even ask for them.
+- The access log has no UPDATE or DELETE policy. Nobody erases an audit trail, admins included.
+- Storage policies match on the first path segment being the caller's workspace. Verified: an upload
+  to another workspace's prefix is refused, and an anonymous download fails even with the exact
+  object path.
+- An attachment cannot be repointed at a different object, which would let someone swap a file's
+  contents while keeping its name and history.
+
+**Fixed**
+
+- `0007_credentials_search_path_fix.sql`: the functions in `0006` called `pgp_sym_encrypt`
+  unqualified while pinning `search_path = public`, and pgcrypto lives in `extensions`. Every
+  credential write failed until this. Schema-qualified rather than widening the path — a permissive
+  `search_path` on a security definer function is how a caller gets it to run their code instead.
+- The upload route returned 400 "malformed upload" for an oversized file, because the body parser
+  gave up before the size check ran. Content-Length is now checked before the body is read, so the
+  limit is enforced deliberately rather than by accident, and the caller gets a 413 that says why.
+
+**Files touched:** `supabase/migrations/000{5,6,7,8}_*.sql`, `src/features/{projects,credentials,shared/attachments}/**`,
+`src/app/(app)/projects/**`, `src/app/api/upload/route.ts`, `src/app/(app)/contacts/[id]/page.tsx`,
+`src/lib/permissions.ts`, `scripts/verify-rls.mjs`
+
+**Migration:** `0005_projects.sql`, `0006_credentials.sql`, `0007_credentials_search_path_fix.sql`,
+`0008_attachments.sql`. All applied to `wjtokyywsuummyaumyty`.
+
+**Notes:**
+
+- Verified: 47/47 RLS and encryption checks, 19/19 end-to-end checks over HTTP. The encryption
+  checks assert the stored bytes are *not* the plaintext, that a reveal returns the original, and
+  that exactly one log row appears per reveal.
+- **`supabase.auth.signOut()` signs out globally by default** — it revokes every session for that
+  user, on every device, not just the current one. Worth deciding whether that is the behaviour you
+  want for a CRM people use on a phone and a desktop; `{ scope: 'local' }` changes it. Recorded as a
+  Known Issue rather than changed unilaterally.
+- Two credential forms rather than one with a union type. The single form only typechecked with
+  `as never`, which was the compiler pointing at the design rather than at itself.
+- Deleting an attachment soft-deletes the row and deliberately leaves the object in the bucket.
+  Storage is not transactional with the database, so removing the file first and failing the row
+  update would leave a row pointing at nothing.
 
 ### 2026-09-24 — Fix: schemas were not idempotent, so no form with an empty optional field could save
 
@@ -418,6 +505,13 @@ so nobody relitigates a settled question six months from now.
 | 2026-09-24 | A trigger, not the UPDATE policy, restricts soft delete | Deleting is an UPDATE that sets `deleted_at`, so one policy cannot tell "a member fixed a phone number" from "a member deleted the client". Only a trigger can see which column changed. |
 | 2026-09-24 | No TanStack Table for contacts, despite §2 naming it | Sorting, filtering, and pagination all happen in Postgres, so the client table renders rows and nothing more. Adding a table library to render a `<table>` is weight without a job. Revisit if column reordering or row selection is ever wanted. |
 | 2026-09-24 | Filter state lives in the URL | A filtered list becomes linkable and survives a refresh, and it is what lets the server component do the filtering. Component state would mean shipping every contact to the browser. |
+| 2026-09-24 | pgcrypto with the key in Supabase Vault, instead of §7.3's pgsodium | pgsodium is deprecated by Supabase and not installed on this project. Checked what existed before choosing. pgcrypto and Vault are both installed, so encryption stays in the database — the alternative, §7.3's app-layer AES fallback, would have moved decryption into code where "every reveal is logged" becomes a convention a future code path can skip. |
+| 2026-09-24 | The encryption key is generated inside the database, never in a file or env var | There is then no copy of it to leak, lose, or commit. Vault encrypts it at rest with a root key held outside the database, so a `pg_dump` is ciphertext with nothing that decrypts it. The cost is that rotation needs a re-encryption script, which does not exist yet. |
+| 2026-09-24 | `credentials` has no INSERT, UPDATE, or DELETE policy at all | Writes go only through the security definer functions. A direct insert would store an unencrypted "secret" and skip the access log, and a policy permissive enough to allow legitimate writes cannot tell the two apart. |
+| 2026-09-24 | Ciphertext columns excluded from the column grants | RLS filters rows, not columns. Without column grants a client could select `secret_encrypted` and take the ciphertext away to attack offline. |
+| 2026-09-24 | Deleting an attachment leaves the object in the bucket | Storage is not transactional with the database. Removing the file first and failing the row update leaves a row pointing at nothing — a broken download instead of a recoverable mistake. A sweep can reclaim the space later. |
+| 2026-09-24 | Credential add and edit are two form components, not one | Creating requires a secret and editing must not, because the edit form never shows the stored value — requiring it would force a reveal, logged as an access that never needed to happen, just to fix a label. One `useForm` covering both only typechecked with `as never`. |
+| 2026-09-24 | Upload is a route handler, not a server action | Server actions serialise arguments through the RSC protocol, which is a poor fit for a 25 MB binary. The route streams straight to storage. |
 
 ---
 
@@ -432,6 +526,9 @@ than the bug itself.
 | 2026-09-24 | `/set-password` did not exist, so invites could not be accepted.                                                                                              | Medium   | Fixed 2026-09-24, Phase 1               |
 | 2026-09-24 | `scripts/verify-rls.mjs` only exercised a super admin, so it could not prove restrictions restrict.                                                            | Medium   | Fixed 2026-09-24, now 22 checks          |
 | 2026-09-24 | Profile menu and password change were disabled in the user menu.                                                                                              | Low      | Fixed 2026-09-24, `/settings/profile`   |
+| 2026-09-24 | `signOut()` uses Supabase's default global scope, so signing out on one device ends every session for that user. Change to `{ scope: 'local' }` if that is not wanted. | Low | Open, needs a decision |
+| 2026-09-24 | Deleting an attachment leaves the object in the bucket by design. Nothing sweeps them, so storage use only grows. Add a periodic purge of objects whose rows have been deleted for 30+ days. | Low | Open, revisit before storage fills |
+| 2026-09-24 | Credential key rotation is unimplemented. Rotating it means re-encrypting every row, and there is no script for that. | Low | Open, write it before it is needed |
 | 2026-09-24 | No SMTP. The email-invite path is written but has never been executed, and password-reset-by-email does not exist. Temporary passwords cover both for now.     | Medium   | Open, needs custom SMTP                 |
 | 2026-09-24 | No backups configured. The free tier's are limited, and §10 calls this the one gap that can actually hurt.                                                     | Medium   | Open, needs a weekly `pg_dump` reminder |
 | 2026-09-24 | Not deployed, and Supabase's Site URL still pointed at localhost.                                                                                              | Medium   | Fixed 2026-09-24                        |

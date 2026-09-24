@@ -687,8 +687,24 @@ a trigger, because an update policy cannot easily restrict a single column.
 
 ### 7.3 Credential encryption
 
-Passwords are encrypted at rest using `pgsodium` with a key held in Supabase Vault. Plaintext
-never sits in a column and never appears in a database backup in readable form.
+> **Built with pgcrypto, not pgsodium.** pgsodium is deprecated by Supabase and is not installed on
+> this project; pgcrypto and Vault 0.3 are. The function boundary, the access log, and the frontend
+> rules below are exactly as designed — only the cipher primitive changed. `pgp_sym_encrypt` and
+> `pgp_sym_decrypt` live in the `extensions` schema and **must be called schema-qualified**, because
+> the security definer functions pin `search_path = public` and should keep doing so.
+>
+> The key is generated randomly inside the database by migration `0006` and stored in Vault under
+> the name `credential_encryption_key`. It exists in no file, no environment variable, and no
+> backup. Rotating it means re-encrypting every row, and no script for that exists yet.
+
+Passwords are encrypted at rest with a key held in Supabase Vault. Plaintext never sits in a column
+and never appears in a database backup in readable form.
+
+**The table has no INSERT, UPDATE, or DELETE policy.** Writes happen only through the security
+definer functions, which bypass RLS by design — a direct insert would store an unencrypted "secret"
+and skip the access log. The ciphertext columns are also excluded from the column grants, so a
+client cannot select them and attack the ciphertext offline. `credential_access_log` has no UPDATE
+or DELETE policy either: nobody erases an audit trail, admins included.
 
 Access goes through two `security definer` functions:
 
@@ -716,9 +732,13 @@ team can reveal, the log is the accountability mechanism. Surface it in the UI a
 - Never log a decrypted secret, never put it in a URL, never render it in a server component
   that streams to the page.
 
-**Fallback if pgsodium becomes awkward:** application layer AES-256-GCM in `lib/crypto.ts` with a
-32 byte key in `CREDENTIAL_ENCRYPTION_KEY`. Same function boundary, same logging, same UI. Record
-the switch in the changelog Decision Log if you take it.
+**The application-layer fallback was considered and not taken.** AES-256-GCM in `lib/crypto.ts`
+with a key in `CREDENTIAL_ENCRYPTION_KEY` protects better against a leaked service-role key, since
+the database alone would yield only ciphertext. It was rejected because decryption then happens in
+application code, so "every reveal is logged" becomes a convention a future code path can skip
+rather than something the database guarantees — and because losing that environment variable would
+destroy every stored credential, with no backups configured. `CREDENTIAL_ENCRYPTION_KEY` therefore
+stays empty and unused. Record the switch in the Decision Log if that trade is ever re-made.
 
 ### 7.4 File storage
 
