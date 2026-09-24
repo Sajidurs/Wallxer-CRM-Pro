@@ -161,6 +161,44 @@ export async function listCompanyOptions(): Promise<
   }));
 }
 
+/**
+ * Every contact as a picker option, people and companies alike.
+ *
+ * Projects link to a client that may be either, so this is deliberately wider
+ * than `listCompanyOptions`. Capped for the same reason: a picker returning ten
+ * thousand rows is not a picker.
+ */
+export async function listContactOptions(): Promise<
+  { id: string; name: string }[]
+> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("contacts")
+    .select("id, type, first_name, last_name, company_name")
+    .is("deleted_at", null)
+    .order("company_name", { ascending: true, nullsFirst: false })
+    .order("first_name", { ascending: true, nullsFirst: false })
+    .limit(1000);
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: displayNameFromRow(row),
+  }));
+}
+
+/** Local copy of the naming rule, so queries do not import from schema.ts. */
+function displayNameFromRow(row: {
+  type: string;
+  first_name: string | null;
+  last_name: string | null;
+  company_name: string | null;
+}): string {
+  if (row.type === "company") return row.company_name ?? "Unnamed company";
+  const name = [row.first_name, row.last_name].filter(Boolean).join(" ");
+  return name || row.company_name || "Unnamed contact";
+}
+
 /** Every tag currently in use, for the filter bar. */
 export async function listUsedTags(): Promise<string[]> {
   const supabase = await createClient();

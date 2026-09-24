@@ -1,12 +1,14 @@
 import { formatDistanceToNow } from "date-fns";
 import {
   Building2,
+  FolderKanban,
   Globe,
   Mail,
   MapPin,
   MessageCircle,
   Pencil,
   Phone,
+  Plus,
   User,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -35,6 +37,8 @@ import {
   TYPE_LABELS,
   displayName,
 } from "@/features/contacts/schema";
+import { listProjectsForContact } from "@/features/projects/queries";
+import { PROJECT_STATUS_LABELS } from "@/features/projects/schema";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -50,7 +54,6 @@ export async function generateMetadata(
 /** Tabs that exist in the design but whose modules have not been built. */
 const PENDING_TABS = [
   { value: "deals", label: "Deals", phase: 5 },
-  { value: "projects", label: "Projects", phase: 3 },
   { value: "tasks", label: "Tasks", phase: 4 },
   { value: "files", label: "Files", phase: 3 },
   { value: "activity", label: "Activity", phase: 7 },
@@ -82,10 +85,11 @@ export default async function ContactDetailPage(
   const actor = await requireUser();
   const { id } = await props.params;
 
-  const [contact, brands, owners] = await Promise.all([
+  const [contact, brands, owners, projects] = await Promise.all([
     getContact(id),
     listBrandOptions(),
     listAssignableUsers(),
+    listProjectsForContact(id),
   ]);
 
   if (!contact) notFound();
@@ -157,6 +161,7 @@ export default async function ContactDetailPage(
       <Tabs defaultValue="overview">
         <TabsList className="flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="projects">Projects ({projects.length})</TabsTrigger>
           {PENDING_TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
@@ -308,6 +313,63 @@ export default async function ContactDetailPage(
               )}
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="projects" className="mt-4">
+          {projects.length === 0 ? (
+            <EmptyState
+              icon={FolderKanban}
+              title="No projects for this client yet"
+              description="A project holds the websites, credentials, and files for one piece of work."
+              action={
+                can(actor, "create", "project") && (
+                  <Button asChild>
+                    <Link href={`/projects/new?contactId=${contact.id}`}>
+                      <Plus />
+                      New project
+                    </Link>
+                  </Button>
+                )
+              }
+            />
+          ) : (
+            <div className="space-y-3">
+              {can(actor, "create", "project") && (
+                <div className="flex justify-end">
+                  <Button asChild size="sm">
+                    <Link href={`/projects/new?contactId=${contact.id}`}>
+                      <Plus />
+                      New project
+                    </Link>
+                  </Button>
+                </div>
+              )}
+              <ul className="divide-y rounded-lg border">
+                {projects.map((project) => (
+                  <li key={project.id} className="flex items-center gap-3 p-3">
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/projects/${project.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {project.name}
+                      </Link>
+                      {project.code && (
+                        <div className="font-mono text-xs text-muted-foreground">
+                          {project.code}
+                        </div>
+                      )}
+                    </div>
+                    <Badge variant="outline">
+                      {PROJECT_STATUS_LABELS[
+                        project.status as keyof typeof PROJECT_STATUS_LABELS
+                      ] ?? project.status}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </TabsContent>
 
         {PENDING_TABS.map((tab) => (

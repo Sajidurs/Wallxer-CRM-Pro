@@ -377,6 +377,166 @@ if (!serviceKey) {
       namelessContact.error?.message ?? "NO ERROR — blank contacts are allowed",
     );
 
+    // --- projects and credentials ----------------------------------------
+    const { data: projectRow } = await admin
+      .from("projects")
+      .insert({
+        workspace_id: workspaceId,
+        name: `RLS Probe Project ${Date.now()}`,
+        status: "active",
+      })
+      .select("id")
+      .single();
+
+    const projectId = projectRow.id;
+
+    const memberProjectEdit = await member
+      .from("projects")
+      .update({ description: "member edit" })
+      .eq("id", projectId);
+    check(
+      "member can edit a project",
+      !memberProjectEdit.error,
+      memberProjectEdit.error?.message ?? "ok",
+    );
+
+    const memberProjectDelete = await member
+      .from("projects")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", projectId);
+    check(
+      "member cannot delete a project",
+      !!memberProjectDelete.error,
+      memberProjectDelete.error?.message ?? "NO ERROR — members can delete projects",
+    );
+
+    // The secret columns must not be selectable at all. RLS filters rows, not
+    // columns, so this is enforced by column-level grants.
+    const rawSecretRead = await member.from("credentials").select("secret_encrypted");
+    check(
+      "ciphertext column is not selectable",
+      !!rawSecretRead.error,
+      rawSecretRead.error?.message ?? "NO ERROR — the ciphertext is readable",
+    );
+
+    const keyRead = await member.rpc("credential_key");
+    check(
+      "credential_key() is not callable by a user",
+      !!keyRead.error,
+      keyRead.error?.message ?? "NO ERROR — the encryption key is reachable",
+    );
+
+    const memberCreateCred = await member.rpc("create_credential", {
+      p_project_id: projectId,
+      p_label: "Member attempt",
+      p_category: "other",
+      p_url: null,
+      p_username: "u",
+      p_secret: "s3cret",
+      p_notes: null,
+      p_contact_id: null,
+    });
+    check(
+      "member cannot create a credential",
+      !!memberCreateCred.error,
+      memberCreateCred.error?.message ?? "NO ERROR — members can add credentials",
+    );
+
+    const SECRET = `probe-secret-${Date.now()}`;
+    const createdCred = await user.rpc("create_credential", {
+      p_project_id: projectId,
+      p_label: "Probe cPanel",
+      p_category: "hosting",
+      p_url: "https://example.test",
+      p_username: "probe-user",
+      p_secret: SECRET,
+      p_notes: "recovery-code-42",
+      p_contact_id: null,
+    });
+    check(
+      "manager can create a credential",
+      !createdCred.error,
+      createdCred.error?.message ?? "ok",
+    );
+
+    const credentialId = createdCred.data;
+
+    if (credentialId) {
+      // The point of the whole exercise: what is on disk is not the secret.
+      const { data: storedRows } = await admin
+        .from("credentials")
+        .select("secret_encrypted, notes_encrypted")
+        .eq("id", credentialId);
+      const stored = JSON.stringify(storedRows?.[0] ?? {});
+      check(
+        "stored secret is ciphertext, not plaintext",
+        !stored.includes(SECRET) && !stored.includes("recovery-code-42"),
+        stored.slice(0, 60) + "...",
+      );
+
+      const beforeReveals = await admin
+        .from("credential_access_log")
+        .select("id", { count: "exact", head: true })
+        .eq("credential_id", credentialId)
+        .eq("action", "reveal");
+
+      // A member may reveal: every active role can, by decision.
+      const memberReveal = await member.rpc("reveal_credential", {
+        p_credential_id: credentialId,
+      });
+      const revealedSecret = memberReveal.data?.[0]?.secret;
+      check(
+        "member can reveal, and gets the original secret back",
+        revealedSecret === SECRET,
+        memberReveal.error?.message ?? `got ${String(revealedSecret).slice(0, 12)}...`,
+      );
+
+      const afterReveals = await admin
+        .from("credential_access_log")
+        .select("id", { count: "exact", head: true })
+        .eq("credential_id", credentialId)
+        .eq("action", "reveal");
+
+      check(
+        "revealing writes exactly one access-log row",
+        (afterReveals.count ?? 0) === (beforeReveals.count ?? 0) + 1,
+        `${beforeReveals.count} -> ${afterReveals.count}`,
+      );
+
+      // The log is an audit trail. Nobody edits or deletes it, admins included.
+      const logDelete = await user
+        .from("credential_access_log")
+        .delete()
+        .eq("credential_id", credentialId);
+      const { count: logStill } = await admin
+        .from("credential_access_log")
+        .select("id", { count: "exact", head: true })
+        .eq("credential_id", credentialId);
+      check(
+        "the access log cannot be erased",
+        (logStill ?? 0) > 0,
+        logDelete.error?.message ?? `${logStill} rows survived`,
+      );
+
+      // A direct insert would skip both encryption and the log, so there is no
+      // INSERT policy on the table at all.
+      const directInsert = await member.from("credentials").insert({
+        workspace_id: workspaceId,
+        project_id: projectId,
+        label: "Direct insert",
+        secret_encrypted: "not-really-encrypted",
+      });
+      check(
+        "credentials cannot be inserted directly",
+        !!directInsert.error,
+        directInsert.error?.message ?? "NO ERROR — encryption is bypassable",
+      );
+
+      await admin.from("credentials").delete().eq("id", credentialId);
+    }
+
+    await admin.from("projects").delete().eq("id", projectId);
+
     // Suspension must deny immediately, without deleting anything.
     await admin.from("profiles").update({ status: "suspended" }).eq("id", memberId);
 

@@ -49,7 +49,11 @@ const RULES: Record<Resource, Partial<Record<Action, Role>>> = {
   task: { view: "member", create: "member", update: "member", delete: "manager" },
   // Every active role may reveal a credential, by decision. Accountability
   // comes from credential_access_log, not from withholding access.
-  credential: { view: "member", create: "manager", update: "manager", delete: "admin", reveal: "member" },
+  // `delete` is manager, not admin, to match what the database actually
+  // enforces in delete_credential. A manager can already delete the whole
+  // project a credential hangs off, so withholding the smaller action only
+  // created a UI that disagreed with the boundary.
+  credential: { view: "member", create: "manager", update: "manager", delete: "manager", reveal: "member" },
   user: { view: "member", create: "admin", update: "admin", delete: "super_admin" },
   brand: { view: "member", create: "admin", update: "admin", delete: "admin" },
   pipeline: { view: "member", create: "admin", update: "admin", delete: "admin" },

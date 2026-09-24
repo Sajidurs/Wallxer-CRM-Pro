@@ -200,6 +200,138 @@ export type Database = {
           },
         ]
       }
+      credential_access_log: {
+        Row: {
+          action: string
+          created_at: string
+          credential_id: string
+          id: string
+          ip: unknown
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          credential_id: string
+          id?: string
+          ip?: unknown
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          credential_id?: string
+          id?: string
+          ip?: unknown
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credential_access_log_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "credentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credential_access_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credential_access_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credentials: {
+        Row: {
+          category: Database["public"]["Enums"]["credential_category"]
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          label: string
+          notes_encrypted: string | null
+          project_id: string | null
+          secret_encrypted: string
+          updated_at: string
+          url: string | null
+          username: string | null
+          workspace_id: string
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["credential_category"]
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          label: string
+          notes_encrypted?: string | null
+          project_id?: string | null
+          secret_encrypted: string
+          updated_at?: string
+          url?: string | null
+          username?: string | null
+          workspace_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["credential_category"]
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          label?: string
+          notes_encrypted?: string | null
+          project_id?: string | null
+          secret_encrypted?: string
+          updated_at?: string
+          url?: string | null
+          username?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credentials_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credentials_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credentials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credentials_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -272,6 +404,166 @@ export type Database = {
           },
         ]
       }
+      project_websites: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          environment: string
+          id: string
+          label: string
+          notes: string | null
+          position: number
+          project_id: string
+          updated_at: string
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          label: string
+          notes?: string | null
+          position?: number
+          project_id: string
+          updated_at?: string
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          label?: string
+          notes?: string | null
+          position?: number
+          project_id?: string
+          updated_at?: string
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_websites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_websites_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_websites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          brand_id: string | null
+          code: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deal_id: string | null
+          deleted_at: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          name: string
+          owner_id: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["project_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          brand_id?: string | null
+          code?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deal_id?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          name: string
+          owner_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["project_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          brand_id?: string | null
+          code?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deal_id?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          name?: string
+          owner_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["project_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string
@@ -309,13 +601,68 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       auth_workspace_id: { Args: never; Returns: string }
+      create_credential: {
+        Args: {
+          p_category: Database["public"]["Enums"]["credential_category"]
+          p_contact_id?: string
+          p_label: string
+          p_notes?: string
+          p_project_id: string
+          p_secret: string
+          p_url: string
+          p_username: string
+        }
+        Returns: string
+      }
+      credential_key: { Args: never; Returns: string }
+      delete_credential: {
+        Args: { p_deleted?: boolean; p_id: string }
+        Returns: undefined
+      }
       is_admin: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      reveal_credential: {
+        Args: { p_credential_id: string }
+        Returns: {
+          notes: string
+          secret: string
+          username: string
+        }[]
+      }
       touch_last_seen: { Args: never; Returns: undefined }
+      update_credential: {
+        Args: {
+          p_category: Database["public"]["Enums"]["credential_category"]
+          p_clear_notes?: boolean
+          p_id: string
+          p_label: string
+          p_notes?: string
+          p_secret?: string
+          p_url: string
+          p_username: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       contact_type: "person" | "company"
+      credential_category:
+        | "hosting"
+        | "domain"
+        | "cms"
+        | "ftp"
+        | "database"
+        | "email"
+        | "analytics"
+        | "social"
+        | "other"
+      project_status:
+        | "planning"
+        | "active"
+        | "on_hold"
+        | "completed"
+        | "cancelled"
       user_role: "super_admin" | "admin" | "manager" | "member"
       user_status: "active" | "invited" | "suspended"
     }
@@ -449,6 +796,24 @@ export const Constants = {
   public: {
     Enums: {
       contact_type: ["person", "company"],
+      credential_category: [
+        "hosting",
+        "domain",
+        "cms",
+        "ftp",
+        "database",
+        "email",
+        "analytics",
+        "social",
+        "other",
+      ],
+      project_status: [
+        "planning",
+        "active",
+        "on_hold",
+        "completed",
+        "cancelled",
+      ],
       user_role: ["super_admin", "admin", "manager", "member"],
       user_status: ["active", "invited", "suspended"],
     },
