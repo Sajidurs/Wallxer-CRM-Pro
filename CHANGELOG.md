@@ -86,6 +86,8 @@ Update this file at the end of every work session, before you stop.
 | `0006_credentials.sql` | Yes, 2026-09-24                   |
 | `0007_credentials_search_path_fix.sql` | Yes, 2026-09-24  |
 | `0008_attachments.sql` | Yes, 2026-09-24                   |
+| `0009_fix_attachment_soft_delete.sql` | Yes, 2026-09-24 |
+| `0010_attachment_authorship.sql` | Yes, 2026-09-24      |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -140,6 +142,52 @@ is not theirs.
 ---
 
 ## Unreleased
+
+### 2026-09-24 — Fix: deleting a file was impossible, and attachment authorship was forgeable
+
+**Fixed**
+
+- Removing a file failed with `new row violates row-level security policy for table "attachments"`,
+  for every user. Reported from real use, not caught by the tests.
+
+  **Root cause.** PostgreSQL requires the row an UPDATE *produces* to still satisfy the SELECT
+  policy. The policy from `0008` was `workspace_id = auth_workspace_id() and deleted_at is null`, so
+  the moment `deleted_at` was set the new row became invisible under its own SELECT policy and the
+  write was rejected. Soft delete could never have worked.
+
+  `contacts` and `projects` were unaffected because their SELECT policies end in `or is_manager()`,
+  which keeps a deleted row visible to whoever is allowed to delete it. `0009` gives attachments the
+  same escape, plus `created_by = auth.uid()`, because the guard deliberately lets people remove
+  files they uploaded and that permission is worthless if the policy blocks the write.
+
+- **Attachment authorship was forgeable.** The insert policy checked only `workspace_id`, so a
+  client could set `created_by` to anyone — and "you may delete your own file" rests entirely on
+  that column being truthful. `0010` constrains it on insert and makes it immutable afterwards.
+  Found while fixing the first bug, not reported.
+
+**Changed**
+
+- `scripts/verify-rls.mjs`: 47 checks to 53. The new ones perform a soft delete and assert the row
+  is actually marked deleted, rather than only checking who is refused one.
+
+**Files touched:** `supabase/migrations/0009_fix_attachment_soft_delete.sql`,
+`supabase/migrations/0010_attachment_authorship.sql`, `scripts/verify-rls.mjs`
+
+**Migration:** `0009_fix_attachment_soft_delete.sql`, `0010_attachment_authorship.sql`. Both applied
+to `wjtokyywsuummyaumyty`.
+
+**Notes:**
+
+- **The rule to carry forward:** on a soft-deletable table, whoever may set `deleted_at` must still
+  satisfy the SELECT policy afterwards. A SELECT policy ending in a bare `deleted_at is null` makes
+  soft delete impossible for everyone. Check this when adding `tasks` in Phase 4.
+- **Why the tests missed it.** Every soft-delete check asserted who was *refused* — a member cannot
+  delete a contact, a member cannot delete a project. Not one of them performed a successful delete
+  and confirmed the row changed. Negative-only tests pass just as happily when the feature is
+  broken for everybody. Both positive paths are now covered.
+- Tests also have to build the row the real code path builds. The attachment probe inserted without
+  `created_by`, which no real upload does, and that gap hid the authorship hole until the delete
+  check forced the row to be realistic.
 
 ### 2026-09-24 — Phase 3, Projects, credentials, and files
 
@@ -511,6 +559,8 @@ so nobody relitigates a settled question six months from now.
 | 2026-09-24 | Ciphertext columns excluded from the column grants | RLS filters rows, not columns. Without column grants a client could select `secret_encrypted` and take the ciphertext away to attack offline. |
 | 2026-09-24 | Deleting an attachment leaves the object in the bucket | Storage is not transactional with the database. Removing the file first and failing the row update leaves a row pointing at nothing — a broken download instead of a recoverable mistake. A sweep can reclaim the space later. |
 | 2026-09-24 | Credential add and edit are two form components, not one | Creating requires a secret and editing must not, because the edit form never shows the stored value — requiring it would force a reveal, logged as an access that never needed to happen, just to fix a label. One `useForm` covering both only typechecked with `as never`. |
+| 2026-09-24 | A soft-deletable table's SELECT policy must keep the deleted row visible to whoever may delete it | Postgres checks the row an UPDATE produces against the SELECT policy. A policy ending in a bare `deleted_at is null` rejects its own soft delete, which is how file deletion shipped broken for every user. |
+| 2026-09-24 | `created_by` on attachments is constrained on insert and immutable after | The right to delete your own file is derived from it. A column the user can set freely cannot carry a permission. |
 | 2026-09-24 | Upload is a route handler, not a server action | Server actions serialise arguments through the RSC protocol, which is a poor fit for a 25 MB binary. The route streams straight to storage. |
 
 ---

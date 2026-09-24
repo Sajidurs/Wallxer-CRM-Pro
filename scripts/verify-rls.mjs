@@ -410,6 +410,28 @@ if (!serviceKey) {
       memberProjectDelete.error?.message ?? "NO ERROR — members can delete projects",
     );
 
+    // The positive path, for the same reason as attachments: only checking who
+    // is *refused* a soft delete leaves the case where nobody can perform one.
+    const managerProjectDelete = await user
+      .from("projects")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", projectId);
+    check(
+      "manager or above can soft-delete a project",
+      !managerProjectDelete.error,
+      managerProjectDelete.error?.message ?? "ok",
+    );
+
+    const restoreProject = await user
+      .from("projects")
+      .update({ deleted_at: null })
+      .eq("id", projectId);
+    check(
+      "a soft-deleted project can be restored",
+      !restoreProject.error,
+      restoreProject.error?.message ?? "ok",
+    );
+
     // The secret columns must not be selectable at all. RLS filters rows, not
     // columns, so this is enforced by column-level grants.
     const rawSecretRead = await member.from("credentials").select("secret_encrypted");
@@ -575,6 +597,7 @@ if (!serviceKey) {
           file_name: "probe.txt",
           mime_type: "text/plain",
           size_bytes: 5,
+          created_by: memberId,
         })
         .select("id")
         .single();
@@ -584,8 +607,33 @@ if (!serviceKey) {
         attachmentInsert.error?.message ?? "ok",
       );
 
+      const forgedAuthor = await member.from("attachments").insert({
+        workspace_id: workspaceId,
+        entity_type: "project",
+        entity_id: projectId,
+        bucket: "project-files",
+        storage_path: ownPath + ".forged",
+        file_name: "forged.txt",
+        created_by: signIn.user.id,
+      });
+      check(
+        "cannot claim someone else uploaded a file",
+        !!forgedAuthor.error,
+        forgedAuthor.error?.message ?? "NO ERROR — authorship is forgeable",
+      );
+
       if (!attachmentInsert.error) {
         const attachmentId = attachmentInsert.data.id;
+
+        const rewriteAuthor = await member
+          .from("attachments")
+          .update({ created_by: signIn.user.id })
+          .eq("id", attachmentId);
+        check(
+          "uploader cannot be rewritten after the fact",
+          !!rewriteAuthor.error,
+          rewriteAuthor.error?.message ?? "NO ERROR — authorship is transferable",
+        );
 
         // An attachment must not be repointed at a different object: that would
         // let someone swap a file's contents while keeping its name and history.
@@ -598,6 +646,41 @@ if (!serviceKey) {
           !!repoint.error,
           repoint.error?.message ?? "NO ERROR — file contents are swappable",
         );
+
+        // The delete path, which shipped broken and was found by a user
+        // rather than by this file.
+        //
+        // PostgreSQL requires the row an UPDATE produces to still satisfy the
+        // SELECT policy. A soft delete sets deleted_at, so a SELECT policy that
+        // ends in `deleted_at is null` makes the new row invisible to itself
+        // and rejects the write. Every soft-deletable table needs a check that
+        // actually performs the delete, not just one that checks who may.
+        const softDelete = await member
+          .from("attachments")
+          .update({ deleted_at: new Date().toISOString() })
+          .eq("id", attachmentId);
+        check(
+          "the uploader can soft-delete their own attachment",
+          !softDelete.error,
+          softDelete.error?.message ?? "ok",
+        );
+
+        const { data: afterDelete } = await admin
+          .from("attachments")
+          .select("deleted_at")
+          .eq("id", attachmentId)
+          .single();
+        check(
+          "the attachment is actually marked deleted",
+          afterDelete?.deleted_at !== null,
+          String(afterDelete?.deleted_at),
+        );
+
+        // Put it back so the checks below still have a live row.
+        await admin
+          .from("attachments")
+          .update({ deleted_at: null })
+          .eq("id", attachmentId);
 
         // Anonymous access must be refused even with the exact object path.
         const anonDownload = await anon.storage
