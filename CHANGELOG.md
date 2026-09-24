@@ -88,8 +88,8 @@ Update this file at the end of every work session, before you stop.
 | `0008_attachments.sql` | Yes, 2026-09-24                   |
 | `0009_fix_attachment_soft_delete.sql` | Yes, 2026-09-24 |
 | `0010_attachment_authorship.sql` | Yes, 2026-09-24      |
-| `0011_tasks.sql`       | Yes, 2026-09-24                   |
-| `0012_resource_links.sql` | Yes, 2026-09-24                |
+| `0011_tasks.sql`       | Yes, 2026-09-25                   |
+| `0012_resource_links.sql` | Yes, 2026-09-25                |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
