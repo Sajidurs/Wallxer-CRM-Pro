@@ -66,6 +66,18 @@ export default async function PipelinePage(props: PageProps<"/pipeline">) {
   const contactsById = Object.fromEntries(contacts.map((c) => [c.id, c.name]));
   const ownersById = Object.fromEntries(owners.map((o) => [o.id, o.name]));
 
+  const values = showValues(settings);
+
+  // When the workspace does not track money, the amounts do not travel to the
+  // browser at all. Not rendering them would have been enough to look right,
+  // but they would still sit in the RSC payload for anyone who opened dev
+  // tools. This is tidiness rather than access control — any workspace member
+  // can read `deals.amount` through the API regardless, because RLS allows it.
+  // If amounts ever need to be restricted, that is a policy, not a setting.
+  const visibleDeals = values
+    ? deals
+    : deals.map((deal) => ({ ...deal, amount: null, currency: "" }));
+
   return (
     <>
       <PageHeader
@@ -89,10 +101,10 @@ export default async function PipelinePage(props: PageProps<"/pipeline">) {
 
       <PipelineBoard
         stages={stages}
-        deals={deals}
+        deals={visibleDeals}
         contacts={contactsById}
         owners={ownersById}
-        showValues={showValues(settings)}
+        showValues={values}
         canMove={can(actor, "update", "deal")}
         newDealHref={`/pipeline/new?pipelineId=${active.id}`}
       />
