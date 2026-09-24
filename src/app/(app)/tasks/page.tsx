@@ -88,7 +88,18 @@ export default async function TasksPage(props: PageProps<"/tasks">) {
         />
       </Suspense>
 
-      {tasks.length === 0 ? (
+      {/* The board renders even with nothing in it. Its columns are the
+          workflow, and hiding them behind an empty state makes the shape of
+          the process invisible and leaves nowhere to drop the first card. The
+          list has no such structure to show, so it keeps the empty state. */}
+      {isBoard ? (
+        <TaskBoard
+          tasks={tasks}
+          people={peopleById}
+          currentUserId={actor.id}
+          isManager={atLeast(actor.role, "manager")}
+        />
+      ) : tasks.length === 0 ? (
         <EmptyState
           icon={CheckSquare}
           title={hasFilters ? "No tasks match those filters" : "No tasks yet"}
@@ -107,13 +118,6 @@ export default async function TasksPage(props: PageProps<"/tasks">) {
               </Button>
             )
           }
-        />
-      ) : isBoard ? (
-        <TaskBoard
-          tasks={tasks}
-          people={peopleById}
-          currentUserId={actor.id}
-          isManager={atLeast(actor.role, "manager")}
         />
       ) : (
         <div className="space-y-4">
