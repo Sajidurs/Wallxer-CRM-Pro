@@ -126,6 +126,8 @@ export default async function TasksPage(props: PageProps<"/tasks">) {
             people={peopleById}
             projects={projectsById}
             linkCounts={linkCounts}
+            currentUserId={actor.id}
+            isManager={atLeast(actor.role, "manager")}
           />
           {listResult && (
             <Suspense fallback={null}>

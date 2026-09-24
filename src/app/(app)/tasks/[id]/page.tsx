@@ -4,7 +4,6 @@ import {
   CalendarDays,
   ExternalLink,
   FolderKanban,
-  Pencil,
   Timer,
   UserRound,
 } from "lucide-react";
@@ -21,6 +20,7 @@ import { displayName } from "@/features/contacts/schema";
 import { getProject } from "@/features/projects/queries";
 import { listResourceLinks } from "@/features/shared/resource-links/queries";
 import { LINK_KIND_LABELS, type LinkKind } from "@/features/shared/resource-links/schema";
+import { TaskActions } from "@/features/tasks/components/task-actions";
 import { getTask } from "@/features/tasks/queries";
 import {
   TASK_PRIORITY_LABELS,
@@ -30,7 +30,7 @@ import {
 } from "@/features/tasks/schema";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
-import { canEditTask } from "@/lib/permissions";
+import { atLeast, canEditTask } from "@/lib/permissions";
 
 export async function generateMetadata(
   props: PageProps<"/tasks/[id]">,
@@ -75,14 +75,14 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[id]">) {
         title={task.title}
         description={`Created ${formatDistanceToNow(new Date(task.created_at))} ago`}
         actions={
-          mayEdit && (
-            <Button asChild variant="outline">
-              <Link href={`/tasks/${task.id}/edit`}>
-                <Pencil />
-                Edit
-              </Link>
-            </Button>
-          )
+          <TaskActions
+            taskId={task.id}
+            title={task.title}
+            canEdit={mayEdit}
+            canDelete={atLeast(actor.role, "manager")}
+            redirectTo="/tasks"
+            variant="buttons"
+          />
         }
       />
 

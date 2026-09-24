@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 
 import type { TaskListItem } from "../queries";
+import { TaskActions } from "./task-actions";
 import {
   TASK_PRIORITY_LABELS,
   TASK_STATUS_LABELS,
@@ -25,6 +26,9 @@ interface TaskListProps {
   people: Record<string, string>;
   projects: Record<string, string>;
   linkCounts: Record<string, number>;
+  /** Editing depends on assignment, so it is decided per row. */
+  currentUserId: string;
+  isManager: boolean;
 }
 
 const PRIORITY_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
@@ -55,7 +59,14 @@ export function dueLabel(task: TaskListItem) {
   };
 }
 
-export function TaskList({ tasks, people, projects, linkCounts }: TaskListProps) {
+export function TaskList({
+  tasks,
+  people,
+  projects,
+  linkCounts,
+  currentUserId,
+  isManager,
+}: TaskListProps) {
   return (
     <div className="rounded-lg border">
       <Table>
@@ -67,6 +78,7 @@ export function TaskList({ tasks, people, projects, linkCounts }: TaskListProps)
             <TableHead className="hidden sm:table-cell">Due</TableHead>
             <TableHead>Priority</TableHead>
             <TableHead className="hidden sm:table-cell">Status</TableHead>
+            <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -147,6 +159,15 @@ export function TaskList({ tasks, people, projects, linkCounts }: TaskListProps)
                   <Badge variant={STATUS_VARIANT[task.status] ?? "outline"}>
                     {TASK_STATUS_LABELS[task.status as TaskStatus] ?? task.status}
                   </Badge>
+                </TableCell>
+
+                <TableCell>
+                  <TaskActions
+                    taskId={task.id}
+                    title={task.title}
+                    canEdit={isManager || task.assigneeIds.includes(currentUserId)}
+                    canDelete={isManager}
+                  />
                 </TableCell>
               </TableRow>
             );
