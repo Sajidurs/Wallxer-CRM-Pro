@@ -834,6 +834,177 @@ if (!serviceKey) {
 
     await admin.from("tasks").delete().in("id", [unassignedTask.id, assignedTask.id]);
 
+    // --- pipeline ----------------------------------------------------------
+    const { data: pipeline } = await admin
+      .from("pipelines")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    if (pipeline) {
+      const { data: stages } = await admin
+        .from("pipeline_stages")
+        .select("id, name, position, is_won, is_lost")
+        .eq("pipeline_id", pipeline.id)
+        .order("position");
+
+      const first = stages[0];
+      const second = stages[1];
+      const wonStage = stages.find((s) => s.is_won);
+
+      const { data: deal } = await admin
+        .from("deals")
+        .insert({
+          workspace_id: workspaceId,
+          pipeline_id: pipeline.id,
+          stage_id: first.id,
+          title: `RLS probe deal ${Date.now()}`,
+        })
+        .select("id, status")
+        .single();
+
+      // The insert is a move too: a deal entering the pipeline starts its
+      // history, or every duration calculation begins from the wrong point.
+      const { count: initialHistory } = await admin
+        .from("deal_stage_history")
+        .select("id", { count: "exact", head: true })
+        .eq("deal_id", deal.id);
+      check(
+        "creating a deal records its first stage",
+        initialHistory === 1,
+        `${initialHistory} history row(s)`,
+      );
+
+      const memberMove = await member
+        .from("deals")
+        .update({ stage_id: second.id, position: 2000 })
+        .eq("id", deal.id);
+      check(
+        "member can move a deal",
+        !memberMove.error,
+        memberMove.error?.message ?? "ok",
+      );
+
+      const { count: afterMove } = await admin
+        .from("deal_stage_history")
+        .select("id", { count: "exact", head: true })
+        .eq("deal_id", deal.id);
+      check(
+        "moving a deal writes exactly one history row",
+        afterMove === 2,
+        `${initialHistory} -> ${afterMove}`,
+      );
+
+      // A no-op update must not manufacture history.
+      await member.from("deals").update({ title: "renamed by probe" }).eq("id", deal.id);
+      const { count: afterRename } = await admin
+        .from("deal_stage_history")
+        .select("id", { count: "exact", head: true })
+        .eq("deal_id", deal.id);
+      check(
+        "editing a deal without moving it writes no history",
+        afterRename === 2,
+        `${afterRename} rows`,
+      );
+
+      // History is the record of what happened. Nobody rewrites it.
+      const historyWrite = await member.from("deal_stage_history").insert({
+        workspace_id: workspaceId,
+        deal_id: deal.id,
+        to_stage_id: first.id,
+      });
+      check(
+        "stage history cannot be forged",
+        !!historyWrite.error,
+        historyWrite.error?.message ?? "NO ERROR — history is writable",
+      );
+
+      const historyDelete = await user
+        .from("deal_stage_history")
+        .delete()
+        .eq("deal_id", deal.id);
+      const { count: historyStill } = await admin
+        .from("deal_stage_history")
+        .select("id", { count: "exact", head: true })
+        .eq("deal_id", deal.id);
+      check(
+        "stage history cannot be erased",
+        (historyStill ?? 0) === 2,
+        historyDelete.error?.message ?? `${historyStill} rows survived`,
+      );
+
+      // Dropping into a won stage closes the deal, decided by the database.
+      if (wonStage) {
+        await member.from("deals").update({ stage_id: wonStage.id }).eq("id", deal.id);
+        const { data: wonDeal } = await admin
+          .from("deals")
+          .select("status, closed_at")
+          .eq("id", deal.id)
+          .single();
+        check(
+          "moving a deal to a won stage marks it won",
+          wonDeal?.status === "won",
+          String(wonDeal?.status),
+        );
+        check(
+          "winning a deal stamps closed_at",
+          wonDeal?.closed_at !== null,
+          String(wonDeal?.closed_at),
+        );
+
+        // And moving it back reopens it, rather than leaving a stale outcome.
+        await member.from("deals").update({ stage_id: second.id }).eq("id", deal.id);
+        const { data: reopened } = await admin
+          .from("deals")
+          .select("status, closed_at")
+          .eq("id", deal.id)
+          .single();
+        check(
+          "moving a deal back out reopens it",
+          reopened?.status === "open" && reopened?.closed_at === null,
+          `${reopened?.status}, closed_at ${reopened?.closed_at}`,
+        );
+      }
+
+      const memberDeleteDeal = await member
+        .from("deals")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", deal.id);
+      check(
+        "member cannot delete a deal",
+        !!memberDeleteDeal.error,
+        memberDeleteDeal.error?.message ?? "NO ERROR — members can delete deals",
+      );
+
+      // Positive path, the check whose absence hid the attachment bug.
+      const managerDeleteDeal = await user
+        .from("deals")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", deal.id);
+      check(
+        "manager can soft-delete a deal",
+        !managerDeleteDeal.error,
+        managerDeleteDeal.error?.message ?? "ok",
+      );
+
+      const memberStage = await member
+        .from("pipeline_stages")
+        .update({ name: "hijacked" })
+        .eq("id", first.id);
+      const { data: stageAfter } = await admin
+        .from("pipeline_stages")
+        .select("name")
+        .eq("id", first.id)
+        .single();
+      check(
+        "member cannot rename a stage",
+        stageAfter?.name === first.name,
+        memberStage.error?.message ?? `still ${stageAfter?.name}`,
+      );
+
+      await admin.from("deals").delete().eq("id", deal.id);
+    }
+
     await admin.from("projects").delete().eq("id", projectId);
 
     // Suspension must deny immediately, without deleting anything.

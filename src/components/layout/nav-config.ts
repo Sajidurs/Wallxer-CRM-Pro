@@ -54,7 +54,6 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/pipeline",
         icon: KanbanSquare,
         resource: "deal",
-        phase: 5,
       },
       {
         title: "Projects",
@@ -91,7 +90,6 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/settings/pipelines",
         icon: Building2,
         resource: "pipeline",
-        phase: 5,
       },
     ],
   },

@@ -70,7 +70,7 @@ Update this file at the end of every work session, before you stop.
 | Contacts                          | Done, deployed       | CSV import is still Phase 7              |
 | Projects, credentials, files      | Done                 | Files attach to contacts too             |
 | Tasks                             | Done                 | List and board; calendar view deferred   |
-| Pipeline                          | Not started          | Phase 5                                  |
+| Pipeline                          | Done                 | Deal values hidden until settings flip   |
 | Dashboard                         | Shell only           | Phase 6 builds the real widgets          |
 | Polish and search                 | Not started          | Phase 7                                  |
 
@@ -90,6 +90,7 @@ Update this file at the end of every work session, before you stop.
 | `0010_attachment_authorship.sql` | Yes, 2026-09-24      |
 | `0011_tasks.sql`       | Yes, 2026-09-25                   |
 | `0012_resource_links.sql` | Yes, 2026-09-25                |
+| `0013_pipeline.sql`    | Yes, 2026-09-25                   |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -120,34 +121,88 @@ the application-layer fallback that was not taken. `SENTRY_DSN` is Phase 7.
 
 ## Next Up
 
-**Phase 5, Pipeline.**
+**Phase 6, Dashboard.**
 
-1. Migration `0013_pipeline.sql`: `pipelines`, `pipeline_stages`, `deals`, the `deal_status`
-   enum, and `deal_stage_history` from section 5.3.
-2. `deal_stage_history` is written by a trigger on `stage_id` change, not by the app, so it
-   cannot be skipped by a future code path.
-3. **Apply the soft-delete rule from 0009** to `deals`: whoever may set `deleted_at` must still
-   satisfy the SELECT policy afterwards, or deletion is impossible for everyone.
-4. `features/pipeline/` per the module contract.
-5. Kanban board, columns from `pipeline_stages`, drag and drop with optimistic updates. The board
-   in `features/tasks/components/task-board.tsx` already does midpoint ordering with the HTML5
-   drag API; follow it rather than adding a library.
-6. A deal is created by picking an existing contact, per section 8.3.
-7. Multiple pipelines from day one — different brands sell differently.
-8. `amount` and `currency` exist in the schema and stay hidden behind
-   `settings.pipeline.show_values`, which is already `false` in the seeded workspace.
-9. `/settings/pipelines`, currently a stub, becomes stage administration: rename, reorder,
-   archive, without a deploy.
-10. Wire the Deals tab on contact detail, which currently says "Phase 5".
-11. Extend `scripts/verify-rls.mjs`: moving a deal writes exactly one history row, and a member
-    cannot delete a deal.
+1. Section 8.1: the dashboard reads the same tables through Postgres **views**, so its numbers can
+   never drift from the modules. Do not query the tables directly from the widgets.
+2. Views for: active projects, open deals, contacts, tasks due today, tasks overdue, deals per
+   stage, projects at risk (`status = 'active'` with a `due_date` in the past).
+3. `activity_log` from section 5.6, written by triggers, feeding the recent-activity widget. It is
+   the last of the four shared subsystems and follows `attachments` and `resource_links`.
+4. Widget rendering driven by a config array, so adding one is an entry plus a component.
+5. "My tasks" reads the same `task_assignees` join the tasks module already uses.
+6. Views run as the caller, so **RLS still applies** — check that a suspended user sees nothing and
+   a member sees the same counts as an admin.
+7. Replace the placeholder counters on `/dashboard`, which currently show a dash and a phase
+   number.
 
-**Definition of done for Phase 5:** a deal can be raised against a contact, dragged between stages
-with the move recorded in `deal_stage_history`, and won or lost.
+**Definition of done for Phase 6:** the dashboard shows real counts that match what each module
+lists, and a recent-activity feed that updates when records change.
 
 ---
 
 ## Unreleased
+
+### 2026-09-25 — Phase 5, Pipeline
+
+**Added**
+
+- Migration `0013_pipeline.sql`: `pipelines`, `pipeline_stages`, `deals`, the `deal_status` enum,
+  and `deal_stage_history`, plus four triggers.
+- `features/pipeline/` per the module contract.
+- `/pipeline`: a kanban board with drag and drop, columns from `pipeline_stages`, midpoint ordering
+  so one row is written per drop. Multiple pipelines from day one, chosen through a picker whose
+  state lives in the URL.
+- `/pipeline/new`, `/pipeline/[id]`, `/pipeline/[id]/edit`. The detail page shows how the deal
+  actually progressed, from the history table.
+- `/settings/pipelines`, previously a stub: add, rename, recolour, reorder, and archive stages, and
+  mark a stage as closing won or lost. No deploy needed, which is the point of stages being data.
+- A default **Sales** pipeline with six stages, created by the migration. A board with no stages is
+  not a board, and a first run should not depend on someone remembering to seed it.
+- The Deals tab on contact detail, replacing the "Phase 5" placeholder.
+
+**Security**
+
+- `deal_stage_history` is written **only** by a trigger and has no INSERT, UPDATE or DELETE policy.
+  Verified: a member cannot forge a history row, and a super admin cannot erase one. How a deal
+  progressed is a record, not an opinion.
+- Stage and pipeline administration is admin-only at the policy level, not just in the UI. Verified:
+  a member renaming a stage leaves it unchanged.
+- Deleting a deal is manager-only, and the SELECT policy carries the `or is_manager()` escape from
+  `0009` so the soft delete does not reject its own result.
+
+**Changed**
+
+- `status` and `closed_at` on a deal are derived from its stage by a trigger, so dragging a card
+  into Won is what wins the deal. The action deliberately does not send either field: two sources
+  of truth for the same fact is how they come to disagree.
+- Archiving a stage that still holds deals is refused with a count, rather than hiding those deals
+  from the board with no route back to them.
+- `scripts/verify-rls.mjs`: 61 checks to 73.
+
+**Files touched:** `supabase/migrations/0013_pipeline.sql`, `src/features/pipeline/**`,
+`src/app/(app)/pipeline/**`, `src/app/(app)/settings/pipelines/page.tsx`,
+`src/app/(app)/contacts/[id]/page.tsx`, `src/components/layout/nav-config.ts`,
+`scripts/verify-rls.mjs`
+
+**Migration:** `0013_pipeline.sql`, applied to `wjtokyywsuummyaumyty`.
+
+**Notes:**
+
+- Verified: 73/73 RLS checks, 14/14 end-to-end over HTTP. The history checks assert that creating a
+  deal records its first stage, that moving it writes **exactly one** row, and that editing it
+  without moving it writes none.
+- **Deal values stay hidden.** `amount` and `currency` exist on the table and are absent from every
+  screen, including the form, while `settings.pipeline.show_values` is false. One helper decides,
+  so nothing renders a number the workspace has chosen not to track. Turning it on is a settings
+  change, not a migration — which was the reason the columns were specified in the first place.
+- The insert is treated as a stage change too. A deal entering the pipeline is the start of its
+  history, and omitting it would make every duration calculation begin from the wrong point.
+- Reordering stages swaps two positions rather than renumbering the column, so a concurrent edit
+  elsewhere in the list cannot be clobbered.
+- `requireAdmin` needed an explicit return type. Without one TypeScript infers a union whose members
+  each carry the other's key as optional, so `guard.error` widened to `string | undefined` even
+  after narrowing on `"error" in guard`.
 
 ### 2026-09-25 — Phase 4, Tasks
 
@@ -635,6 +690,11 @@ so nobody relitigates a settled question six months from now.
 | 2026-09-24 | Credential add and edit are two form components, not one | Creating requires a secret and editing must not, because the edit form never shows the stored value — requiring it would force a reveal, logged as an access that never needed to happen, just to fix a label. One `useForm` covering both only typechecked with `as never`. |
 | 2026-09-24 | A soft-deletable table's SELECT policy must keep the deleted row visible to whoever may delete it | Postgres checks the row an UPDATE produces against the SELECT policy. A policy ending in a bare `deleted_at is null` rejects its own soft delete, which is how file deletion shipped broken for every user. |
 | 2026-09-24 | `created_by` on attachments is constrained on insert and immutable after | The right to delete your own file is derived from it. A column the user can set freely cannot carry a permission. |
+| 2026-09-25 | A deal's `status` and `closed_at` are derived from its stage by a trigger | Dragging a card into Won is how a deal is won; nobody wants to then remember a separate status field. Two sources of truth for the same fact is how they come to disagree, so the action does not send either. |
+| 2026-09-25 | `deal_stage_history` is written only by a trigger, with no write policies at all | It is the raw material for velocity and conversion reporting, and it cannot be backfilled. A row nobody can forge or erase is worth more than one the app remembers to write. |
+| 2026-09-25 | The default pipeline is created by the migration, not seed.sql | seed.sql has already run against the live project, and a first-run experience should not depend on someone remembering to re-run it. A board with no stages is not a board. |
+| 2026-09-25 | Archiving a stage holding deals is refused, with a count | Archiving hides the stage from the board, and with it any deals sitting in it, with no route back. Refusing with a number is more useful than silently losing work. |
+| 2026-09-25 | Deal values are hidden from the form too, not just from displays | A half-filled amount on a workspace that has chosen not to track money is worse than no amount: it looks like data. |
 | 2026-09-25 | Task assignment is restricted in step with task editing | A member may edit tasks assigned to them. If assignment were open, assigning yourself any task would be a one-step route to editing everything — the permission would grant itself. |
 | 2026-09-25 | `completed_at` is set by a trigger, not the app | It must not drift from `status`, and Phase 6's dashboard counts depend on it. A write that bypasses the app still leaves an honest timestamp. |
 | 2026-09-25 | The board uses the HTML5 drag API, not a drag-and-drop library | Five columns, one card at a time. A library would be more code and another dependency for behaviour the platform already has. Revisit for multi-select or nested sorting. |

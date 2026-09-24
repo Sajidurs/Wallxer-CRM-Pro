@@ -41,6 +41,13 @@ import { listProjectsForContact } from "@/features/projects/queries";
 import { PROJECT_STATUS_LABELS } from "@/features/projects/schema";
 import { AttachmentsPanel } from "@/features/shared/attachments/components/attachments-panel";
 import { listAttachments } from "@/features/shared/attachments/queries";
+import { ContactDealList } from "@/features/pipeline/components/contact-deal-list";
+import {
+  getWorkspaceSettings,
+  listAllStages,
+  listDealsForContact,
+} from "@/features/pipeline/queries";
+import { showValues } from "@/features/pipeline/schema";
 import { EntityTaskList } from "@/features/tasks/components/entity-task-list";
 import { listTasksFor } from "@/features/tasks/queries";
 import { listAssignableUsers } from "@/features/users/queries";
@@ -56,10 +63,7 @@ export async function generateMetadata(
 }
 
 /** Tabs that exist in the design but whose modules have not been built. */
-const PENDING_TABS = [
-  { value: "deals", label: "Deals", phase: 5 },
-  { value: "activity", label: "Activity", phase: 7 },
-];
+const PENDING_TABS = [{ value: "activity", label: "Activity", phase: 7 }];
 
 function DetailRow({
   icon: Icon,
@@ -95,7 +99,12 @@ export default async function ContactDetailPage(
     listAttachments("contact", id),
   ]);
 
-  const tasks = await listTasksFor("contact_id", id);
+  const [tasks, deals, stages, settings] = await Promise.all([
+    listTasksFor("contact_id", id),
+    listDealsForContact(id),
+    listAllStages(),
+    getWorkspaceSettings(),
+  ]);
 
   if (!contact) notFound();
 
@@ -166,6 +175,7 @@ export default async function ContactDetailPage(
       <Tabs defaultValue="overview">
         <TabsList className="flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="deals">Deals ({deals.length})</TabsTrigger>
           <TabsTrigger value="projects">Projects ({projects.length})</TabsTrigger>
           <TabsTrigger value="tasks">Tasks ({tasks.length})</TabsTrigger>
           <TabsTrigger value="files">Files ({attachments.length})</TabsTrigger>
@@ -340,6 +350,16 @@ export default async function ContactDetailPage(
               )}
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="deals" className="mt-4">
+          <ContactDealList
+            deals={deals}
+            stages={stages}
+            contactId={contact.id}
+            showValues={showValues(settings)}
+            canCreate={can(actor, "create", "deal")}
+          />
         </TabsContent>
 
         <TabsContent value="projects" className="mt-4">
