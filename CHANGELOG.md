@@ -120,7 +120,7 @@ the application-layer fallback that was not taken. `SENTRY_DSN` is Phase 7.
 
 **Phase 4, Tasks.**
 
-1. Migration `0009_tasks.sql`: `tasks`, `task_assignees`, the `task_status` and
+1. Migration `0011_tasks.sql`: `tasks`, `task_assignees`, the `task_status` and
    `task_priority` enums, indexes, RLS, and the soft-delete guard from `0004`.
 2. Migration for `resource_links` (section 5.6) — the named-URL subsystem. Same polymorphic shape
    as `attachments`, so it follows that pattern rather than inventing a new one.
