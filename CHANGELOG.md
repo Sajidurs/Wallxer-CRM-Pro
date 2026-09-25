@@ -155,6 +155,53 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-25 — Contacts as a Notion database table
+
+**Changed**
+
+The contacts list was a shadcn table sitting on a page. It is now a database grid, which is the
+shape the reference actually has.
+
+- **A grid, not stripes.** Hairlines run in both directions. Notion's tables read as a spreadsheet
+  because the columns are divided, not because the rows are banded.
+- **Headers recede behind their property type.** Each column heading is a muted 12px label after a
+  small icon standing for what the column holds — text, select, email, person, date, multi-select.
+  The icon is what makes the heading scannable at that weight.
+- **The first column is the title property**: the only bold cell and the only row link, underlined
+  on hover, with the job title tucked under it in small muted text.
+- **Status and Type became pills.** Soft pastel chips on the Notion palette, with a leading dot on
+  Status because it is a state rather than a label. Lead reads blue, Active green, Inactive and
+  Archived grey; Person purple, Company amber.
+- **Row actions stay invisible** until the row is hovered or focused, so the grid reads as data
+  instead of as a column of buttons.
+- Empty cells render an em dash rather than nothing, so a sparse row still reads as a row.
+
+**Added**
+
+- `src/components/common/pill.tsx` — the pastel chip, seven tones, optional leading dot, with dark
+  mode values for each. Shared, because Projects, Tasks and Pipeline all need the same chip next.
+
+**Notes:**
+
+- Columns drop out by breakpoint rather than scrolling on a laptop: Type at `sm`, Email at `md`,
+  Phone and Brand at `lg`, Owner and Tags at `xl`. Name and Status are always present, since a row
+  you cannot identify or triage is not worth showing.
+- Tags show two and then a `+n` count. A row whose tag list wraps to three lines destroys the grid.
+- Labels come from `TYPE_LABELS` and `STATUS_LABELS` in the module schema rather than being typed
+  into the component again. `contact.status` is a plain string in the generated types, so its lookup
+  falls back to the raw value; `contact.type` is a union and does not need to.
+- Verified by rendering `/contacts` against the production build as a signed-in user, not by
+  reading the diff: 200, the grid, the hairlines, the pills and the headers are all in the HTML.
+- Ran `prettier` on the two files in this change. The repo has no prettier config, so this was a
+  one-off on files written this session and nothing pre-existing was reformatted.
+- **Still to restyle:** Projects, Tasks and Pipeline lists, the detail pages, and the auth screens.
+
+**Files touched:** `src/features/contacts/components/contacts-table.tsx`,
+`src/components/common/pill.tsx`
+
+**Migration:** none
+
+
 ### 2026-09-25 — Notion-style UI, first pass
 
 **Changed**
