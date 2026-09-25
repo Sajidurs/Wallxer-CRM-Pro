@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listBrandOptions } from "@/features/brands/queries";
 import { listContactOptions } from "@/features/contacts/queries";
 import { ProjectFilters } from "@/features/projects/components/project-filters";
-import { ProjectsTable } from "@/features/projects/components/projects-table";
+import { ProjectsGrid } from "@/features/projects/components/projects-grid";
 import { listProjects } from "@/features/projects/queries";
 import { projectFiltersSchema } from "@/features/projects/schema";
 import { listAssignableUsers } from "@/features/users/queries";
@@ -84,11 +84,13 @@ export default async function ProjectsPage(props: PageProps<"/projects">) {
         />
       ) : (
         <div className="space-y-4">
-          <ProjectsTable
+          <ProjectsGrid
             projects={result.projects}
             brands={brands}
             owners={owners}
             clients={clients}
+            canEdit={can(actor, "update", "project")}
+            canDelete={can(actor, "delete", "project")}
           />
           <Suspense fallback={null}>
             <Pagination

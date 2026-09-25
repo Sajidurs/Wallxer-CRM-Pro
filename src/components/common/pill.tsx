@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 export type PillTone =
   "grey" | "blue" | "green" | "amber" | "red" | "purple" | "pink";
 
-const TONES: Record<PillTone, string> = {
+/** Exported so other surfaces (card icon tiles) can tint from the same palette. */
+export const TONE_CLASSES: Record<PillTone, string> = {
   grey: "bg-[#F1F0EF] text-[#5F5E5B] dark:bg-white/8 dark:text-white/70",
   blue: "bg-[#E7F3F8] text-[#28647D] dark:bg-[#1d3a47] dark:text-[#9ecfe4]",
   green: "bg-[#EDF3EC] text-[#4A7B45] dark:bg-[#22331f] dark:text-[#a9d3a1]",
@@ -51,7 +52,7 @@ export function Pill({
     <span
       className={cn(
         "inline-flex max-w-full items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium",
-        TONES[tone],
+        TONE_CLASSES[tone],
         className,
       )}
     >

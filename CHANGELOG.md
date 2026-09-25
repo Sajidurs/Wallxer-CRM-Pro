@@ -155,6 +155,59 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-25 — Projects as a card grid
+
+**Changed**
+
+Projects left the table and became a grid of cards, on the supplied file-manager reference. The
+shape fits: a project *is* a container — websites, credentials, files — so it should read like a
+folder rather than a row.
+
+- **Card anatomy**, following the reference: a tinted icon tile top-left, an overflow menu
+  top-right, the name, then the client, then a footer splitting state from ownership.
+- **The icon tile is tinted by status**, the way the reference tints by file type. Planning grey,
+  Active blue, On hold amber, Completed green, Cancelled red.
+- **The whole card is the link**, via an overlay pseudo-element, so a card opens as easily as a
+  folder does. The overflow menu is lifted above it so its clicks still land.
+- **Owner becomes an initials chip** in the corner, as in the reference. Profiles have no avatar
+  images, and the reference uses lettered chips for exactly that case.
+- **Brand is a coloured dot** before the client name rather than its own column.
+- Due date sits under the status pill and turns red only while the work is still live. A completed
+  project with a past due date is finished, not late.
+
+**Added**
+
+- `src/features/projects/components/project-card-actions.tsx` — the card's overflow menu, with Edit
+  and a confirmed Delete.
+- `TONE_CLASSES` is now exported from `pill.tsx`, so the icon tiles tint from the same palette
+  instead of repeating the hex values.
+
+**Fixed**
+
+- **`setProjectDeleted` had no caller.** It has existed since Phase 3 with passing RLS tests and no
+  way to reach it from the interface — the projects table had no actions column at all. This is the
+  third time a working action shipped with no button (files, then tasks, now projects); the tests
+  prove the action is *safe*, never that it is *reachable*.
+
+**Notes:**
+
+- Grid is 1/2/3/4 columns by breakpoint. Filters and pagination are untouched.
+- Verified by rendering `/projects` against the production build as a signed-in user: 200, the grid,
+  the card shell, the pills and the due line are all in the HTML. Also confirmed `size-4.5` and
+  `line-clamp-2` actually compiled into the stylesheet — an uncompiled size class would have left
+  the folder icons at lucide's 24px default and nothing would have failed loudly.
+- **Two deliberate departures from the reference.** Its hover state inverts the card to dark navy;
+  across a grid of twelve that flashes a dark block under the cursor, so hover is a shadow lift
+  instead. Its two-tier "Recently opened / Files" grouping was skipped because grouping would fight
+  the existing status filter and break across pagination. Both are easy to add if wanted.
+- **Still to restyle:** Tasks and Pipeline lists, the detail pages, and the auth screens.
+
+**Files touched:** `src/features/projects/components/{projects-grid,project-card-actions}.tsx`
+(replacing `projects-table.tsx`), `src/app/(app)/projects/page.tsx`, `src/components/common/pill.tsx`
+
+**Migration:** none
+
+
 ### 2026-09-25 — Contacts as a Notion database table
 
 **Changed**
