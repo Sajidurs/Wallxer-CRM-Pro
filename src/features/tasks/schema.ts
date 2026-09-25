@@ -107,7 +107,7 @@ export const taskFiltersSchema = z.object({
   brandId: z.uuid().optional(),
   /** Relative windows, resolved against now() in the query. */
   due: z.enum(["overdue", "today", "week", "none"]).optional(),
-  view: z.enum(["list", "board"]).default("list"),
+  view: z.enum(["list", "board"]).default("board"),
   page: z.coerce.number().int().min(1).max(10_000).default(1),
   sort: z.enum(["due", "priority", "recent"]).default("due"),
 });

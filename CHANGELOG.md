@@ -155,6 +155,52 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-25 — Tasks: Kanban by default, on the reference design
+
+**Changed**
+
+- **The board is now the default view.** `/tasks` with no query string opens Kanban; List is still one
+  click away and unchanged. Changed in two places that have to agree — the `view` default in
+  `taskFiltersSchema` (server) and the fallback in `task-filters.tsx` (client). Changing only one
+  would have made the toggle render "List" as active while the server drew a board.
+- **Columns are tinted by meaning**, faintly, with a full-strength dot of the same hue in the
+  heading: To do grey, In progress blue, In review purple, Blocked red, Done green. Five quiet tints
+  side by side still read as one surface; the dot is what makes a column identifiable at that
+  weight. Count sits beside the heading in parentheses, with a `+` on the right.
+- **Cards follow the reference**: priority pill top-left, overflow menu top-right, title on two
+  lines, then a footer splitting the due date (with a calendar icon) from the assignee chips.
+  Priority uses the shared pill — Urgent red, High amber, Medium purple, Low blue.
+- **Assignees are an overlapping chip stack**, three then `+n`. The old card named only the first
+  assignee and silently hid the rest.
+- **The whole card is the link** and the visible drag grip is gone; the card itself is the handle,
+  as in the reference.
+- **Columns keep their width and scroll sideways** instead of compressing. The old board packed five
+  columns into a grid, which at laptop width gave each one less room than the card inside it.
+
+**Notes:**
+
+- Drag and drop is untouched: same HTML5 handlers, same optimistic local copy, same `midpoint`
+  positioning, same rollback when the server refuses, same rule that non-managers may only move what
+  is assigned to them. This was a restyle, not a rewrite.
+- The overflow menu gives the board Edit and Delete, which it never had — `TaskActions` was only
+  wired into the list.
+- **No progress bar.** The reference's cards show a "Progress 10%" bar and there is no progress data
+  in the schema: no column on `tasks`, no checklist or subtask table. Deriving a percentage from
+  status would have drawn a bar that reads 50% for every in-progress task regardless of how much is
+  actually done, which is decoration impersonating data. Left out pending a decision on whether to
+  add a real column.
+- The reference's top tab strip (Kanban / List / Files / Dashboard / Setting) was not adopted: this
+  app navigates by sidebar and breadcrumb, and three of those tabs have no equivalent here. The
+  existing List/Board toggle still does that job.
+- Verified against the running dev server as a signed-in user: `/tasks` returns 200 and renders all
+  five columns with no list table, and `/tasks?view=list` still renders the table with no board.
+
+**Files touched:** `src/features/tasks/components/{task-board,task-filters}.tsx`,
+`src/features/tasks/schema.ts`
+
+**Migration:** none
+
+
 ### 2026-09-25 — Projects as a card grid
 
 **Changed**

@@ -49,7 +49,7 @@ export function TaskFilters({ people, projects, currentUserId }: TaskFiltersProp
     setSearch(urlQuery);
   }
 
-  const view = searchParams.get("view") ?? "list";
+  const view = searchParams.get("view") ?? "board";
 
   function apply(changes: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
