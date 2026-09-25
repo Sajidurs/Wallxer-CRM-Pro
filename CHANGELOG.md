@@ -45,7 +45,7 @@ Update this file at the end of every work session, before you stop.
 ## Current State
 
 **Last updated:** 2026-09-25
-**Phase:** 6 complete. Phases 0 through 6 done. Only Phase 7 (polish) remains.
+**Phase:** 7 in progress. CSV import done; comments, global search, Sentry and a trash view remain.
 **Deployed:** yes — https://wallxer-crm-pro.vercel.app
 **Supabase project:** `wjtokyywsuummyaumyty`, free tier
 **Repo:** https://github.com/Sajidurs/Wallxer-CRM-Pro, branch `main`
@@ -72,7 +72,7 @@ Update this file at the end of every work session, before you stop.
 | Tasks                             | Done                 | List and board; calendar view deferred   |
 | Pipeline                          | Done                 | Deal values hidden until settings flip   |
 | Dashboard                         | Done                 | Counts through views; activity feed live |
-| Polish and search                 | Not started          | Phase 7                                  |
+| Polish and search                 | In progress          | CSV import done; comments, search remain |
 
 ### Migrations applied
 
@@ -119,6 +119,7 @@ the application-layer fallback that was not taken. `SENTRY_DSN` is Phase 7.
 | `npm run verify:rls`       | Asserts the policies hold. Needs `CHECK_EMAIL` and `CHECK_PASSWORD` |
 | `npm run verify:schemas`   | Asserts every Zod schema is idempotent. Run after touching one     |
 | `npm run backup`           | Logical backup to `backups/<timestamp>/`. See RESTORE.md            |
+| Import contacts            | `/contacts/import` — CSV, deduplicated on email                     |
 | `curl <url>/api/health`    | Says which commit is actually deployed                             |
 
 ---
@@ -153,6 +154,48 @@ can be commented on, and one search box finds anything.
 ---
 
 ## Unreleased
+
+### 2026-09-25 — Phase 7 begins: CSV import for contacts
+
+**Added**
+
+- `/contacts/import`: upload a CSV, correct the guessed column mapping, preview without saving,
+  then import. Reached from an Import button beside New contact.
+- `features/contacts/import/`: `csv.ts` (parser and mapping), `actions.ts`, `components/`.
+- Column guessing from real-world header names — "First Name", "E-mail", "Client Email Address",
+  "Mobile", "Zip Code" and so on — with every guess shown and correctable before anything is
+  written.
+- A dry run that reports exactly what would happen, row by row, and writes nothing.
+- Per-import defaults for owner, brand, and status, applied to every row.
+
+**Deduplication is on email**, case-insensitively, resolving open question 2 in section 14. Chosen
+by the owner on 2026-09-25.
+
+**Notes:**
+
+- **Section 8.2 is satisfied literally:** the import validates through the same `contactSchema` the
+  manual form uses, so a row the form would reject is rejected here too. It has no separate idea of
+  what a valid contact is.
+- **No CSV library.** The awkward part of the format is quoted fields containing commas and
+  newlines, and that is about thirty lines. Verified against a file with a quoted comma, an
+  embedded newline, a doubled quote, and a UTF-8 BOM — the last of which Excel writes and which
+  otherwise becomes part of the first header name and stops it matching anything.
+- **Rows with no email cannot be deduplicated**, which is inherent to the rule chosen: nothing
+  identifies them. Re-importing the same file creates them again. The wizard now counts those rows
+  and says so, on both the preview and the result, so it is a known trade-off rather than a
+  surprise found later. Verified: re-importing a six-row file updated the three with emails and
+  created the one without.
+- Duplicates *within* one file are collapsed too, not just against existing contacts.
+- Inserts go in batches of 200. One statement per row would be thousands of round trips to Seoul;
+  one statement for everything would let a single bad row lose the whole import.
+- Capped at 5,000 rows per import, and at 200 reported rows, so a large file does not return a
+  larger report than the data.
+
+**Files touched:** `src/features/contacts/import/**`, `src/app/(app)/contacts/import/page.tsx`,
+`src/app/(app)/contacts/page.tsx`
+
+**Migration:** none
+
 
 ### 2026-09-25 — Performance: pages were taking seconds
 
@@ -846,6 +889,9 @@ so nobody relitigates a settled question six months from now.
 | 2026-09-24 | Credential add and edit are two form components, not one | Creating requires a secret and editing must not, because the edit form never shows the stored value — requiring it would force a reveal, logged as an access that never needed to happen, just to fix a label. One `useForm` covering both only typechecked with `as never`. |
 | 2026-09-24 | A soft-deletable table's SELECT policy must keep the deleted row visible to whoever may delete it | Postgres checks the row an UPDATE produces against the SELECT policy. A policy ending in a bare `deleted_at is null` rejects its own soft delete, which is how file deletion shipped broken for every user. |
 | 2026-09-24 | `created_by` on attachments is constrained on insert and immutable after | The right to delete your own file is derived from it. A column the user can set freely cannot carry a permission. |
+| 2026-09-25 | Contacts deduplicate on email alone, case-insensitively | Open question 2 in §14, decided by the owner. Simple and predictable; a row with no email is always created, because nothing identifies it. The cost is that re-importing a list duplicates its emailless rows, so the wizard counts them and says so rather than letting it be discovered later. |
+| 2026-09-25 | CSV parsed by hand, no library | The one hard part of the format is quoted fields containing commas and newlines, and that is thirty lines. A dependency would be larger than the problem it solves. |
+| 2026-09-25 | The importer validates through the same schema as the manual form | §8.2 requires it. Two definitions of a valid contact would diverge on the first change to either. |
 | 2026-09-25 | Every dashboard view is `security_invoker = on` | A Postgres view runs as its owner by default and bypasses the querying user's RLS. A dashboard built that way shows one workspace's numbers to another's users and looks entirely correct doing it. |
 | 2026-09-25 | The dashboard reads views, never tables | Section 8.1. A count written by hand in the page drifts the first time a module changes its filters. The views apply the same conditions the lists do, in one place, so the two cannot disagree. |
 | 2026-09-25 | `activity_log` carries a denormalised `label` in `changes` | The feed would otherwise need a join per row across four tables. It also means an entry keeps the name the record had at the time, which for a record of what happened is arguably more truthful than today's name. |

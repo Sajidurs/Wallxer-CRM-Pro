@@ -1,4 +1,4 @@
-import { Plus, Users } from "lucide-react";
+import { Plus, Upload, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -55,12 +55,20 @@ export default async function ContactsPage(props: PageProps<"/contacts">) {
         description="Every person and company across all brands."
         actions={
           canCreate && (
-            <Button asChild>
-              <Link href="/contacts/new">
-                <Plus />
-                New contact
-              </Link>
-            </Button>
+            <>
+              <Button asChild variant="outline">
+                <Link href="/contacts/import">
+                  <Upload />
+                  Import
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/contacts/new">
+                  <Plus />
+                  New contact
+                </Link>
+              </Button>
+            </>
           )
         }
       />
