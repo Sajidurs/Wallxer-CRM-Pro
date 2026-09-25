@@ -45,7 +45,7 @@ Update this file at the end of every work session, before you stop.
 ## Current State
 
 **Last updated:** 2026-09-25
-**Phase:** 5 complete. Phases 0 through 5 done.
+**Phase:** 6 complete. Phases 0 through 6 done. Only Phase 7 (polish) remains.
 **Deployed:** yes — https://wallxer-crm-pro.vercel.app
 **Supabase project:** `wjtokyywsuummyaumyty`, free tier
 **Repo:** https://github.com/Sajidurs/Wallxer-CRM-Pro, branch `main`
@@ -71,7 +71,7 @@ Update this file at the end of every work session, before you stop.
 | Projects, credentials, files      | Done                 | Files attach to contacts too             |
 | Tasks                             | Done                 | List and board; calendar view deferred   |
 | Pipeline                          | Done                 | Deal values hidden until settings flip   |
-| Dashboard                         | Shell only           | Phase 6 builds the real widgets          |
+| Dashboard                         | Done                 | Counts through views; activity feed live |
 | Polish and search                 | Not started          | Phase 7                                  |
 
 ### Migrations applied
@@ -91,6 +91,9 @@ Update this file at the end of every work session, before you stop.
 | `0011_tasks.sql`       | Yes, 2026-09-25                   |
 | `0012_resource_links.sql` | Yes, 2026-09-25                |
 | `0013_pipeline.sql`    | Yes, 2026-09-25                   |
+| `0014_activity_log.sql` | Yes, 2026-09-25                  |
+| `0015_dashboard_views.sql` | Yes, 2026-09-25               |
+| `0016_fix_activity_label.sql` | Yes, 2026-09-25            |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -121,27 +124,93 @@ the application-layer fallback that was not taken. `SENTRY_DSN` is Phase 7.
 
 ## Next Up
 
-**Phase 6, Dashboard.**
+**Phase 7, Polish.** The last phase. Section 9 lists: global search, activity feed, CSV import,
+comments, Sentry, empty states. The activity feed shipped with Phase 6, so what remains:
 
-1. Section 8.1: the dashboard reads the same tables through Postgres **views**, so its numbers can
-   never drift from the modules. Do not query the tables directly from the widgets.
-2. Views for: active projects, open deals, contacts, tasks due today, tasks overdue, deals per
-   stage, projects at risk (`status = 'active'` with a `due_date` in the past).
-3. `activity_log` from section 5.6, written by triggers, feeding the recent-activity widget. It is
-   the last of the four shared subsystems and follows `attachments` and `resource_links`.
-4. Widget rendering driven by a config array, so adding one is an entry plus a component.
-5. "My tasks" reads the same `task_assignees` join the tasks module already uses.
-6. Views run as the caller, so **RLS still applies** — check that a suspended user sees nothing and
-   a member sees the same counts as an admin.
-7. Replace the placeholder counters on `/dashboard`, which currently show a dash and a phase
-   number.
+1. **CSV import for contacts** — the one that matters most, given the existing lists. Section 8.2:
+   it must write through the same Zod schema and server action as the manual form, so validation
+   cannot diverge. Decide the deduplication rule first — it is still open question 2 in section 14:
+   match on email, or email plus phone?
+2. **`comments`** from section 5.6, the fourth shared subsystem. Same polymorphic shape as
+   `attachments` and `resource_links`, so follow those rather than inventing a third pattern.
+   `comments.mentions` already exists for notifications later.
+3. **Global search** across contacts, projects, tasks, and deals. Contacts already has a
+   `search_vector`; the others would need one, or a shared search view.
+4. **Sentry**, free tier, with `SENTRY_DSN`.
+5. A trash view, so a soft-deleted record can be restored without the Undo toast or a hand-written
+   query. Currently a Known Issue for contacts.
 
-**Definition of done for Phase 6:** the dashboard shows real counts that match what each module
-lists, and a recent-activity feed that updates when records change.
+**Before or alongside Phase 7, two operational gaps that are not features:**
+
+- **Backups.** Section 10 calls this the one free-tier gap that can actually hurt, and the database
+  now holds real client data and encrypted credentials. A weekly `pg_dump` to Drive closes it.
+- **Custom SMTP**, so email invites and password resets work at all.
+
+**Definition of done for Phase 7:** an existing contact list imports without duplicates, any record
+can be commented on, and one search box finds anything.
 
 ---
 
 ## Unreleased
+
+### 2026-09-25 — Phase 6, Dashboard
+
+**Added**
+
+- Migration `0014_activity_log.sql`: `activity_log`, the fourth and last shared subsystem from
+  section 5.6, written by one generic trigger attached to contacts, projects, tasks, and deals.
+  Adding it to a new module is a `create trigger` line.
+- Migration `0015_dashboard_views.sql`: five views — counts, deals by stage, projects at risk,
+  recent activity, my tasks.
+- A real `/dashboard`: five counters that link to the filtered list behind them, a recent-activity
+  feed, my tasks, a pipeline summary, and projects at risk. The placeholder counters that showed a
+  dash and a phase number are gone.
+- `features/dashboard/` with `widgets.ts`, a config array. Section 8.1: adding a widget is an entry
+  plus a component, not an edit to the page's layout.
+
+**Security**
+
+- **Every view is `security_invoker = on`, and that is the whole security story of this phase.** A
+  Postgres view runs as its *owner* by default, which bypasses the RLS of whoever queries it. A
+  dashboard built on owner views would show one workspace's numbers to another's users and look
+  entirely correct doing it. Verified: `anon` gets `permission denied`, and a member and an admin
+  see identical counts.
+- `activity_log` is readable by the workspace and writable by nobody — no INSERT, UPDATE, or DELETE
+  policy at all. Verified: a member cannot forge a row and a super admin cannot erase one.
+
+**Fixed**
+
+- **`0016_fix_activity_label.sql`: the trigger in `0014` broke creating and editing every record it
+  was attached to.** It chose a display label with a `CASE` over `tg_table_name` referencing
+  `v_row.first_name`, `v_row.name`, and `v_row.title` in different branches. SQL `CASE` evaluates
+  lazily but PL/pgSQL does not work that way: it rewrites the whole expression into a SQL query and
+  resolves *every* record field reference as a parameter, whichever branch would run. A field the
+  triggering table lacks therefore raises, always — so contacts failed on `name` and projects
+  failed on `first_name`. Rewritten to ask the row as `to_jsonb(v_row) ->> 'field'`, which returns
+  null for an absent key.
+
+**Changed**
+
+- `scripts/verify-rls.mjs`: 73 checks to 84.
+
+**Files touched:** `supabase/migrations/001{4,5,6}_*.sql`, `src/features/dashboard/**`,
+`src/app/(app)/dashboard/page.tsx`, `scripts/verify-rls.mjs`
+
+**Migration:** `0014_activity_log.sql`, `0015_dashboard_views.sql`, `0016_fix_activity_label.sql`.
+All applied to `wjtokyywsuummyaumyty`.
+
+**Notes:**
+
+- Verified: 84/84 RLS checks, 11/11 end-to-end. The end-to-end checks read the numbers **out of the
+  rendered HTML** and compare them against a direct count of the tables, which is the only way to
+  catch a dashboard that is confidently wrong.
+- **The counts and the lists are the same question.** Each view applies the same `deleted_at is
+  null` and status filters the module lists use, so they cannot drift. A count written by hand in
+  the page would have drifted the first time a module changed its filters.
+- The label in `changes` is denormalised, so a feed entry keeps the name the record had at the
+  time rather than its current one. For a record of what happened, that is arguably more truthful.
+- No chart library for the pipeline bars. Section 8.1 asks for "a simple bar" and these are div
+  widths; a dependency for five of them would be weight without a job.
 
 ### 2026-09-25 — Phase 5, Pipeline
 
@@ -690,6 +759,10 @@ so nobody relitigates a settled question six months from now.
 | 2026-09-24 | Credential add and edit are two form components, not one | Creating requires a secret and editing must not, because the edit form never shows the stored value — requiring it would force a reveal, logged as an access that never needed to happen, just to fix a label. One `useForm` covering both only typechecked with `as never`. |
 | 2026-09-24 | A soft-deletable table's SELECT policy must keep the deleted row visible to whoever may delete it | Postgres checks the row an UPDATE produces against the SELECT policy. A policy ending in a bare `deleted_at is null` rejects its own soft delete, which is how file deletion shipped broken for every user. |
 | 2026-09-24 | `created_by` on attachments is constrained on insert and immutable after | The right to delete your own file is derived from it. A column the user can set freely cannot carry a permission. |
+| 2026-09-25 | Every dashboard view is `security_invoker = on` | A Postgres view runs as its owner by default and bypasses the querying user's RLS. A dashboard built that way shows one workspace's numbers to another's users and looks entirely correct doing it. |
+| 2026-09-25 | The dashboard reads views, never tables | Section 8.1. A count written by hand in the page drifts the first time a module changes its filters. The views apply the same conditions the lists do, in one place, so the two cannot disagree. |
+| 2026-09-25 | `activity_log` carries a denormalised `label` in `changes` | The feed would otherwise need a join per row across four tables. It also means an entry keeps the name the record had at the time, which for a record of what happened is arguably more truthful than today's name. |
+| 2026-09-25 | No chart library for the pipeline summary | Section 8.1 asks for "a simple bar" and these are div widths. Five of them do not justify a dependency. |
 | 2026-09-25 | A deal's `status` and `closed_at` are derived from its stage by a trigger | Dragging a card into Won is how a deal is won; nobody wants to then remember a separate status field. Two sources of truth for the same fact is how they come to disagree, so the action does not send either. |
 | 2026-09-25 | `deal_stage_history` is written only by a trigger, with no write policies at all | It is the raw material for velocity and conversion reporting, and it cannot be backfilled. A row nobody can forge or erase is worth more than one the app remembers to write. |
 | 2026-09-25 | The default pipeline is created by the migration, not seed.sql | seed.sql has already run against the live project, and a first-run experience should not depend on someone remembering to re-run it. A board with no stages is not a board. |

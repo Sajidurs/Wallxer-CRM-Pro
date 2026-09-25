@@ -1007,6 +1007,130 @@ if (!serviceKey) {
 
     await admin.from("projects").delete().eq("id", projectId);
 
+    // --- dashboard views ---------------------------------------------------
+    // A Postgres view runs as its OWNER by default, which silently bypasses the
+    // RLS of whoever queries it. A dashboard built that way would show one
+    // workspace's numbers to another's users and look entirely correct doing
+    // it. Every view is security_invoker; these checks are what prove it.
+
+    const memberCounts = await member.from("v_dashboard_counts").select("*").maybeSingle();
+    check(
+      "member can read the dashboard counts",
+      !memberCounts.error && !!memberCounts.data,
+      memberCounts.error?.message ?? "ok",
+    );
+
+    const adminCounts = await user.from("v_dashboard_counts").select("*").maybeSingle();
+    check(
+      "member and admin see the same counts",
+      JSON.stringify(memberCounts.data) === JSON.stringify(adminCounts.data),
+      `member ${JSON.stringify(memberCounts.data)}`,
+    );
+
+    const anonCounts = await anon.from("v_dashboard_counts").select("*");
+    check(
+      "anon cannot read the dashboard counts",
+      !!anonCounts.error || (anonCounts.data?.length ?? 0) === 0,
+      anonCounts.error?.message ?? `rows: ${anonCounts.data?.length}`,
+    );
+
+    const anonActivity = await anon.from("v_recent_activity").select("*");
+    check(
+      "anon cannot read the activity feed",
+      !!anonActivity.error || (anonActivity.data?.length ?? 0) === 0,
+      anonActivity.error?.message ?? `rows: ${anonActivity.data?.length}`,
+    );
+
+    // The counts must agree with what the modules list, or the dashboard is
+    // lying. Section 8.1 is the reason these are views over the same tables.
+    const { count: contactRows } = await member
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null);
+    check(
+      "the contacts count matches the contacts list",
+      Number(memberCounts.data?.contacts ?? -1) === (contactRows ?? -2),
+      `view ${memberCounts.data?.contacts}, list ${contactRows}`,
+    );
+
+    // --- activity log ------------------------------------------------------
+    const { data: loggedContact } = await member
+      .from("contacts")
+      .insert({
+        workspace_id: workspaceId,
+        type: "person",
+        first_name: "Activity",
+        last_name: `Probe ${Date.now()}`,
+        status: "lead",
+      })
+      .select("id")
+      .single();
+
+    const { data: logRows } = await admin
+      .from("activity_log")
+      .select("action, entity_type, actor_id, changes")
+      .eq("entity_id", loggedContact.id);
+    check(
+      "creating a record writes an activity row",
+      logRows?.length === 1 && logRows[0].action === "created",
+      JSON.stringify(logRows?.[0]),
+    );
+    check(
+      "the activity row names the actor",
+      logRows?.[0]?.actor_id === memberId,
+      String(logRows?.[0]?.actor_id),
+    );
+    check(
+      "the activity row carries a label to render",
+      typeof logRows?.[0]?.changes?.label === "string",
+      String(logRows?.[0]?.changes?.label),
+    );
+
+    await member
+      .from("contacts")
+      .update({ status: "active" })
+      .eq("id", loggedContact.id);
+    const { data: statusRows } = await admin
+      .from("activity_log")
+      .select("action, changes")
+      .eq("entity_id", loggedContact.id)
+      .eq("action", "status_changed");
+    check(
+      "a status change is logged as such, with both values",
+      statusRows?.[0]?.changes?.from === "lead" && statusRows?.[0]?.changes?.to === "active",
+      JSON.stringify(statusRows?.[0]?.changes),
+    );
+
+    // An audit trail that can be edited is not one.
+    const forgeActivity = await member.from("activity_log").insert({
+      workspace_id: workspaceId,
+      entity_type: "contact",
+      entity_id: loggedContact.id,
+      action: "created",
+    });
+    check(
+      "activity cannot be forged",
+      !!forgeActivity.error,
+      forgeActivity.error?.message ?? "NO ERROR — the audit trail is writable",
+    );
+
+    const eraseActivity = await user
+      .from("activity_log")
+      .delete()
+      .eq("entity_id", loggedContact.id);
+    const { count: activityStill } = await admin
+      .from("activity_log")
+      .select("id", { count: "exact", head: true })
+      .eq("entity_id", loggedContact.id);
+    check(
+      "activity cannot be erased",
+      (activityStill ?? 0) > 0,
+      eraseActivity.error?.message ?? `${activityStill} rows survived`,
+    );
+
+    await admin.from("activity_log").delete().eq("entity_id", loggedContact.id);
+    await admin.from("contacts").delete().eq("id", loggedContact.id);
+
     // Suspension must deny immediately, without deleting anything.
     await admin.from("profiles").update({ status: "suspended" }).eq("id", memberId);
 

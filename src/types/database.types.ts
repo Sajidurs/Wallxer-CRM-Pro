@@ -39,6 +39,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          changes: Json
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          workspace_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          changes?: Json
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          workspace_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          changes?: Json
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attachments: {
         Row: {
           bucket: string
@@ -384,6 +432,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "credentials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_projects_at_risk"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "credentials_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -443,11 +498,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "deal_stage_history_from_stage_id_fkey"
+            columns: ["from_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_deals_by_stage"
+            referencedColumns: ["stage_id"]
+          },
+          {
             foreignKeyName: "deal_stage_history_to_stage_id_fkey"
             columns: ["to_stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_stage_history_to_stage_id_fkey"
+            columns: ["to_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_deals_by_stage"
+            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "deal_stage_history_workspace_id_fkey"
@@ -567,6 +636,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_deals_by_stage"
+            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "deals_workspace_id_fkey"
@@ -810,6 +886,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "project_websites_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_projects_at_risk"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "project_websites_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -1009,6 +1092,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "task_assignees_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "v_my_tasks"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_assignees_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -1114,10 +1204,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "v_my_tasks"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tasks_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_projects_at_risk"
             referencedColumns: ["id"]
           },
           {
@@ -1158,7 +1262,137 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_dashboard_counts: {
+        Row: {
+          active_projects: number | null
+          contacts: number | null
+          open_deals: number | null
+          tasks_due_today: number | null
+          tasks_overdue: number | null
+        }
+        Relationships: []
+      }
+      v_deals_by_stage: {
+        Row: {
+          color: string | null
+          deal_count: number | null
+          is_lost: boolean | null
+          is_won: boolean | null
+          pipeline_id: string | null
+          position: number | null
+          stage_id: string | null
+          stage_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_my_tasks: {
+        Row: {
+          due_at: string | null
+          id: string | null
+          priority: Database["public"]["Enums"]["task_priority"] | null
+          project_id: string | null
+          status: Database["public"]["Enums"]["task_status"] | null
+          title: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_assignees_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_projects_at_risk"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_projects_at_risk: {
+        Row: {
+          code: string | null
+          contact_id: string | null
+          days_overdue: number | null
+          due_date: string | null
+          id: string | null
+          name: string | null
+          owner_id: string | null
+        }
+        Insert: {
+          code?: string | null
+          contact_id?: string | null
+          days_overdue?: never
+          due_date?: string | null
+          id?: string | null
+          name?: string | null
+          owner_id?: string | null
+        }
+        Update: {
+          code?: string | null
+          contact_id?: string | null
+          days_overdue?: never
+          due_date?: string | null
+          id?: string | null
+          name?: string | null
+          owner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_recent_activity: {
+        Row: {
+          action: string | null
+          actor_id: string | null
+          actor_name: string | null
+          changes: Json | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       auth_role: {
