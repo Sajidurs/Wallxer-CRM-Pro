@@ -832,6 +832,128 @@ if (!serviceKey) {
       String(reopened?.completed_at),
     );
 
+    // --- task checklists (0018) --------------------------------------------
+    // A checklist inherits its task's edit rule through can_edit_task. The
+    // interesting case is the member who is NOT assigned: reading is allowed
+    // (the progress bar has to be explainable), writing is not.
+
+    const checklistOnMine = await member
+      .from("task_checklist_items")
+      .insert({
+        workspace_id: workspaceId,
+        task_id: assignedTask.id,
+        title: "__probe_mine__",
+      })
+      .select("id")
+      .single();
+    check(
+      "member can add a subtask to their own task",
+      !checklistOnMine.error && !!checklistOnMine.data,
+      checklistOnMine.error?.message ?? "inserted",
+    );
+
+    const checklistOnOthers = await member
+      .from("task_checklist_items")
+      .insert({
+        workspace_id: workspaceId,
+        task_id: unassignedTask.id,
+        title: "__probe_theirs__",
+      })
+      .select("id");
+    check(
+      "member cannot add a subtask to someone else's task",
+      !!checklistOnOthers.error,
+      checklistOnOthers.error?.message ?? "NO ERROR — members can edit any checklist",
+    );
+
+    // Planted by the admin so the member has something they may not touch.
+    const { data: foreignItem } = await admin
+      .from("task_checklist_items")
+      .insert({
+        workspace_id: workspaceId,
+        task_id: unassignedTask.id,
+        title: "__probe_foreign__",
+      })
+      .select("id")
+      .single();
+
+    const foreignToggle = await member
+      .from("task_checklist_items")
+      .update({ is_done: true })
+      .eq("id", foreignItem.id)
+      .select("id");
+    check(
+      "member cannot tick a subtask on someone else's task",
+      (foreignToggle.data?.length ?? 0) === 0,
+      foreignToggle.error?.message ?? `rows affected: ${foreignToggle.data?.length}`,
+    );
+
+    const foreignDelete = await member
+      .from("task_checklist_items")
+      .delete()
+      .eq("id", foreignItem.id)
+      .select("id");
+    check(
+      "member cannot delete a subtask on someone else's task",
+      (foreignDelete.data?.length ?? 0) === 0,
+      foreignDelete.error?.message ?? `rows affected: ${foreignDelete.data?.length}`,
+    );
+
+    const foreignRead = await member
+      .from("task_checklist_items")
+      .select("id")
+      .eq("id", foreignItem.id);
+    check(
+      "member can still read that subtask",
+      (foreignRead.data?.length ?? 0) === 1,
+      foreignRead.error?.message ?? `rows: ${foreignRead.data?.length}`,
+    );
+
+    // completed_at is stamped by the database, exactly as on tasks.
+    await member
+      .from("task_checklist_items")
+      .update({ is_done: true })
+      .eq("id", checklistOnMine.data.id);
+    const { data: tickedItem } = await admin
+      .from("task_checklist_items")
+      .select("completed_at")
+      .eq("id", checklistOnMine.data.id)
+      .single();
+    check(
+      "ticking a subtask stamps completed_at",
+      tickedItem?.completed_at !== null,
+      String(tickedItem?.completed_at),
+    );
+
+    await member
+      .from("task_checklist_items")
+      .update({ is_done: false })
+      .eq("id", checklistOnMine.data.id);
+    const { data: untickedItem } = await admin
+      .from("task_checklist_items")
+      .select("completed_at")
+      .eq("id", checklistOnMine.data.id)
+      .single();
+    check(
+      "unticking a subtask clears completed_at",
+      untickedItem?.completed_at === null,
+      String(untickedItem?.completed_at),
+    );
+
+    const anonChecklist = await anon.from("task_checklist_items").select("*");
+    check(
+      "anon cannot read subtasks",
+      (anonChecklist.data?.length ?? 0) === 0,
+      anonChecklist.error
+        ? anonChecklist.error.message
+        : `rows: ${anonChecklist.data?.length}`,
+    );
+
+    await admin
+      .from("task_checklist_items")
+      .delete()
+      .in("task_id", [unassignedTask.id, assignedTask.id]);
+
     await admin.from("tasks").delete().in("id", [unassignedTask.id, assignedTask.id]);
 
     // --- pipeline ----------------------------------------------------------

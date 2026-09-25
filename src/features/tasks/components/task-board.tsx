@@ -230,6 +230,38 @@ export function TaskBoard({
                       <span className="line-clamp-2">{task.title}</span>
                     </Link>
 
+                    {/* Only where there is a checklist to measure. A bar that
+                        is always empty says nothing except that the feature
+                        exists. */}
+                    {task.checklist.total > 0 && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Progress</span>
+                          <span className="font-medium text-muted-foreground">
+                            {Math.round(
+                              (task.checklist.done / task.checklist.total) * 100,
+                            )}
+                            %
+                          </span>
+                        </div>
+                        <div
+                          className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-border"
+                          role="progressbar"
+                          aria-valuenow={task.checklist.done}
+                          aria-valuemin={0}
+                          aria-valuemax={task.checklist.total}
+                          aria-label={`${task.checklist.done} of ${task.checklist.total} subtasks done`}
+                        >
+                          <div
+                            className="h-full rounded-full bg-primary transition-[width] duration-300"
+                            style={{
+                              width: `${(task.checklist.done / task.checklist.total) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     <div className="mt-3 flex items-center justify-between gap-2">
                       {due ? (
                         <span

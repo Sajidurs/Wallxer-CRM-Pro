@@ -13,6 +13,12 @@ const LIST_COLUMNS = `
   created_at, updated_at, created_by, deleted_at
 `;
 
+/** Ticked over total. The board draws a bar from this; nothing stores a percent. */
+export interface ChecklistProgress {
+  done: number;
+  total: number;
+}
+
 export type TaskListItem = Pick<
   Task,
   | "id"
@@ -31,7 +37,7 @@ export type TaskListItem = Pick<
   | "updated_at"
   | "created_by"
   | "deleted_at"
-> & { assigneeIds: string[] };
+> & { assigneeIds: string[]; checklist: ChecklistProgress };
 
 export interface TaskListResult {
   tasks: TaskListItem[];
@@ -48,30 +54,48 @@ const PRIORITY_WEIGHT: Record<string, number> = {
   low: 3,
 };
 
-async function attachAssignees(
+/**
+ * The two things a task row cannot carry itself: who it is assigned to, and
+ * how much of its checklist is ticked.
+ *
+ * Both are one query for the whole page rather than one per task. A board of
+ * 500 cards would otherwise be 1000 round trips to Seoul.
+ */
+async function attachDetails(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  tasks: Omit<TaskListItem, "assigneeIds">[],
+  tasks: Omit<TaskListItem, "assigneeIds" | "checklist">[],
 ): Promise<TaskListItem[]> {
   if (tasks.length === 0) return [];
 
-  const { data } = await supabase
-    .from("task_assignees")
-    .select("task_id, user_id")
-    .in(
-      "task_id",
-      tasks.map((task) => task.id),
-    );
+  const ids = tasks.map((task) => task.id);
+
+  const [{ data: assignees }, { data: items }] = await Promise.all([
+    supabase.from("task_assignees").select("task_id, user_id").in("task_id", ids),
+    supabase
+      .from("task_checklist_items")
+      .select("task_id, is_done")
+      .in("task_id", ids),
+  ]);
 
   const byTask = new Map<string, string[]>();
-  for (const row of data ?? []) {
+  for (const row of assignees ?? []) {
     const list = byTask.get(row.task_id) ?? [];
     list.push(row.user_id);
     byTask.set(row.task_id, list);
   }
 
+  const progress = new Map<string, ChecklistProgress>();
+  for (const row of items ?? []) {
+    const current = progress.get(row.task_id) ?? { done: 0, total: 0 };
+    current.total += 1;
+    if (row.is_done) current.done += 1;
+    progress.set(row.task_id, current);
+  }
+
   return tasks.map((task) => ({
     ...task,
     assigneeIds: byTask.get(task.id) ?? [],
+    checklist: progress.get(task.id) ?? { done: 0, total: 0 },
   }));
 }
 
@@ -151,7 +175,7 @@ export async function listTasks(filters: TaskFilters): Promise<TaskListResult> {
 
   if (error) throw new Error(`Could not load tasks: ${error.message}`);
 
-  let rows = (data ?? []) as Omit<TaskListItem, "assigneeIds">[];
+  let rows = (data ?? []) as Omit<TaskListItem, "assigneeIds" | "checklist">[];
 
   if (filters.sort === "priority") {
     rows = [...rows].sort(
@@ -162,7 +186,7 @@ export async function listTasks(filters: TaskFilters): Promise<TaskListResult> {
   const total = count ?? 0;
 
   return {
-    tasks: await attachAssignees(supabase, rows),
+    tasks: await attachDetails(supabase, rows),
     total,
     page: filters.page,
     pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)),
@@ -202,7 +226,7 @@ export async function listBoardTasks(
   const { data, error } = await query;
   if (error) throw new Error(`Could not load the board: ${error.message}`);
 
-  return attachAssignees(supabase, (data ?? []) as Omit<TaskListItem, "assigneeIds">[]);
+  return attachDetails(supabase, (data ?? []) as Omit<TaskListItem, "assigneeIds" | "checklist">[]);
 }
 
 export async function getTask(id: string): Promise<(Task & { assigneeIds: string[] }) | null> {
@@ -240,5 +264,22 @@ export async function listTasksFor(
     .order("due_at", { ascending: true, nullsFirst: false })
     .limit(200);
 
-  return attachAssignees(supabase, (data ?? []) as Omit<TaskListItem, "assigneeIds">[]);
+  return attachDetails(supabase, (data ?? []) as Omit<TaskListItem, "assigneeIds" | "checklist">[]);
+}
+
+export type ChecklistItem = Tables<"task_checklist_items">;
+
+/** One task's checklist, in board order. */
+export async function listChecklistItems(
+  taskId: string,
+): Promise<ChecklistItem[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("task_checklist_items")
+    .select("*")
+    .eq("task_id", taskId)
+    .order("position", { ascending: true });
+
+  return data ?? [];
 }

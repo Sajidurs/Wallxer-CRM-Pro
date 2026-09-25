@@ -21,7 +21,8 @@ import { getProject } from "@/features/projects/queries";
 import { listResourceLinks } from "@/features/shared/resource-links/queries";
 import { LINK_KIND_LABELS, type LinkKind } from "@/features/shared/resource-links/schema";
 import { TaskActions } from "@/features/tasks/components/task-actions";
-import { getTask } from "@/features/tasks/queries";
+import { TaskChecklist } from "@/features/tasks/components/task-checklist";
+import { getTask, listChecklistItems } from "@/features/tasks/queries";
 import {
   TASK_PRIORITY_LABELS,
   TASK_STATUS_LABELS,
@@ -54,11 +55,12 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[id]">) {
   const task = await getTask(id);
   if (!task) notFound();
 
-  const [people, links, project, contact] = await Promise.all([
+  const [people, links, project, contact, checklist] = await Promise.all([
     listAssignableUsers(),
     listResourceLinks("task", task.id),
     task.project_id ? getProject(task.project_id) : Promise.resolve(null),
     task.contact_id ? getContact(task.contact_id) : Promise.resolve(null),
+    listChecklistItems(task.id),
   ]);
 
   const peopleById = new Map(people.map((p) => [p.id, p.name]));
@@ -113,6 +115,21 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[id]">) {
               ) : (
                 <p className="text-sm text-muted-foreground">No description.</p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                {`Subtasks (${checklist.filter((item) => item.is_done).length}/${checklist.length})`}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TaskChecklist
+                taskId={task.id}
+                items={checklist}
+                canEdit={mayEdit}
+              />
             </CardContent>
           </Card>
 

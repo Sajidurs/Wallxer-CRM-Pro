@@ -130,3 +130,37 @@ export function midpoint(before: number | null, after: number | null): number {
   if (after === null) return before + 1000;
   return (before + after) / 2;
 }
+
+// ---------------------------------------------------------------------------
+// Checklist
+// ---------------------------------------------------------------------------
+// A task's subtasks. Their ratio is what the board's progress bar draws, which
+// is why there is no percentage field anywhere: a number nobody maintains by
+// hand goes stale, and this one cannot.
+
+/**
+ * Trimmed before the emptiness check, not after.
+ *
+ * `min(1)` ahead of the transform would accept "   " and then store "", which
+ * the database's title_present constraint would reject with an error nobody
+ * could act on.
+ */
+export const checklistItemSchema = z.object({
+  taskId: z.uuid(),
+  title: z
+    .string()
+    .max(300, "That item is too long")
+    .transform((value) => value.trim())
+    .refine((value) => value.length > 0, "Give the item a title"),
+});
+
+export type ChecklistItemValues = z.infer<typeof checklistItemSchema>;
+
+export const toggleChecklistItemSchema = z.object({
+  id: z.uuid(),
+  isDone: z.boolean(),
+});
+
+export const removeChecklistItemSchema = z.object({
+  id: z.uuid(),
+});

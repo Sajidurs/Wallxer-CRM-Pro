@@ -9,9 +9,13 @@ import { createClient } from "@/lib/supabase/server";
 import { fieldErrorsFromZod, firstIssueMessage } from "@/lib/zod";
 
 import {
+  checklistItemSchema,
   deleteTaskSchema,
+  midpoint,
   moveTaskSchema,
+  removeChecklistItemSchema,
   taskSchema,
+  toggleChecklistItemSchema,
   updateTaskSchema,
   type TaskValues,
 } from "./schema";
@@ -253,4 +257,140 @@ export async function setTaskDeleted(
 
   revalidateTask(parsed.data.id);
   return ok({ id: parsed.data.id, deleted: parsed.data.deleted });
+}
+
+// ---------------------------------------------------------------------------
+// Checklist
+// ---------------------------------------------------------------------------
+// Every one of these repeats the task's own edit rule before writing. The
+// database enforces it too, in `can_edit_task` — these exist so a refusal
+// arrives as a sentence rather than as a policy violation.
+
+/** Shared preamble: an active actor who is allowed to edit this task. */
+async function requireTaskEditor(taskId: string) {
+  const actor = await getCurrentUser();
+  if (!actor || actor.status !== "active") {
+    return { ok: false as const, error: "Your session has expired. Sign in again." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: assignees } = await supabase
+    .from("task_assignees")
+    .select("user_id")
+    .eq("task_id", taskId);
+
+  if (
+    !canEditTask(actor, {
+      assigneeIds: (assignees ?? []).map((row) => row.user_id),
+    })
+  ) {
+    return { ok: false as const, error: "You can only change tasks assigned to you." };
+  }
+
+  return { ok: true as const, actor, supabase };
+}
+
+export async function addChecklistItem(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const parsed = checklistItemSchema.safeParse(input);
+  if (!parsed.success) {
+    return fail(
+      firstIssueMessage(parsed.error),
+      fieldErrorsFromZod(parsed.error),
+    );
+  }
+
+  const gate = await requireTaskEditor(parsed.data.taskId);
+  if (!gate.ok) return fail(gate.error);
+
+  // Appended to the end. The last position plus a gap, so inserting between
+  // two items later is still one write.
+  const { data: last } = await gate.supabase
+    .from("task_checklist_items")
+    .select("position")
+    .eq("task_id", parsed.data.taskId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data, error } = await gate.supabase
+    .from("task_checklist_items")
+    .insert({
+      workspace_id: gate.actor.workspace_id,
+      task_id: parsed.data.taskId,
+      title: parsed.data.title,
+      position: midpoint(last?.position ?? null, null),
+      created_by: gate.actor.id,
+    })
+    .select("id")
+    .single();
+
+  if (error) return fail(error.message);
+
+  revalidateTask(parsed.data.taskId);
+  return ok({ id: data.id });
+}
+
+export async function setChecklistItemDone(
+  input: unknown,
+): Promise<ActionResult<undefined>> {
+  const parsed = toggleChecklistItemSchema.safeParse(input);
+  if (!parsed.success) return fail("That item is not valid.");
+
+  const supabase = await createClient();
+
+  const { data: item } = await supabase
+    .from("task_checklist_items")
+    .select("task_id")
+    .eq("id", parsed.data.id)
+    .maybeSingle();
+
+  if (!item) return fail("That item no longer exists.");
+
+  const gate = await requireTaskEditor(item.task_id);
+  if (!gate.ok) return fail(gate.error);
+
+  const { error } = await gate.supabase
+    .from("task_checklist_items")
+    .update({ is_done: parsed.data.isDone })
+    .eq("id", parsed.data.id);
+
+  if (error) return fail(error.message);
+
+  revalidateTask(item.task_id);
+  return ok();
+}
+
+export async function removeChecklistItem(
+  input: unknown,
+): Promise<ActionResult<undefined>> {
+  const parsed = removeChecklistItemSchema.safeParse(input);
+  if (!parsed.success) return fail("That item is not valid.");
+
+  const supabase = await createClient();
+
+  const { data: item } = await supabase
+    .from("task_checklist_items")
+    .select("task_id")
+    .eq("id", parsed.data.id)
+    .maybeSingle();
+
+  if (!item) return fail("That item no longer exists.");
+
+  const gate = await requireTaskEditor(item.task_id);
+  if (!gate.ok) return fail(gate.error);
+
+  // Hard delete, by the reasoning in migration 0018: a checklist item is a
+  // note, not history. Invariant 6 guards the records the business is made of.
+  const { error } = await gate.supabase
+    .from("task_checklist_items")
+    .delete()
+    .eq("id", parsed.data.id);
+
+  if (error) return fail(error.message);
+
+  revalidateTask(item.task_id);
+  return ok();
 }

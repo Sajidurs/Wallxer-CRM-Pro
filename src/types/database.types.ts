@@ -1114,6 +1114,84 @@ export type Database = {
           },
         ]
       }
+      task_checklist_items: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_done: boolean
+          position: number
+          task_id: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_done?: boolean
+          position?: number
+          task_id: string
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_done?: boolean
+          position?: number
+          task_id?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_checklist_items_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_checklist_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_checklist_items_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_checklist_items_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "v_my_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_checklist_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           actual_minutes: number | null
@@ -1400,6 +1478,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       auth_workspace_id: { Args: never; Returns: string }
+      can_edit_task: { Args: { p_task_id: string }; Returns: boolean }
       create_credential: {
         Args: {
           p_category: Database["public"]["Enums"]["credential_category"]

@@ -94,6 +94,8 @@ Update this file at the end of every work session, before you stop.
 | `0014_activity_log.sql` | Yes, 2026-09-25                  |
 | `0015_dashboard_views.sql` | Yes, 2026-09-25               |
 | `0016_fix_activity_label.sql` | Yes, 2026-09-25            |
+| `0017_lock_credential_key.sql` | Yes, 2026-09-25          |
+| `0018_task_checklist.sql` | Yes, 2026-09-25                |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -154,6 +156,60 @@ can be commented on, and one search box finds anything.
 ---
 
 ## Unreleased
+
+### 2026-09-25 — Subtask checklists, and a progress bar that means something
+
+**Added**
+
+The board's cards now carry the reference's progress bar. It is computed, not stored: ticked
+subtasks over total subtasks. A percentage somebody has to remember to drag is a percentage that
+goes stale by Thursday.
+
+- **`task_checklist_items`** (migration 0018): title, `is_done`, fractional `position`, and
+  `completed_at` / `completed_by` stamped by the database exactly as `tasks.completed_at` is.
+- **A checklist panel on the task detail page** — tick, add, remove. Ticking is optimistic, because a
+  checkbox that waits for Seoul before it moves feels broken.
+- **The progress bar on each board card**, shown only where there is a checklist to measure. A bar
+  that is always empty communicates nothing but its own existence.
+- **`can_edit_task(uuid)`**, a security-definer function with a pinned search path. A checklist
+  inherits its task's edit rule — managers edit anything, a member edits only what is assigned to
+  them — and stating it once keeps the four policies from drifting apart.
+
+**Notes:**
+
+- **Hard delete, deliberately.** Invariant 6 guards the records the business is made of; a checklist
+  item is a note, not history, and `resource_links` already sits outside the invariant in 0012 for
+  the same reason. Removing a line you mistyped should not leave a tombstone.
+- The `sync_checklist_item_done` trigger returns from its INSERT branch before any reference to OLD.
+  Migration 0016 exists because PL/pgSQL resolves every record field reference in an expression
+  regardless of which branch would run, so `tg_op = 'INSERT' or old.is_done` would not have been
+  safe however it reads.
+- `attachAssignees` became `attachDetails` and now fetches assignees and checklist counts in one
+  `Promise.all` for the whole page. Per-card queries would have been 1000 round trips for a full
+  board.
+- **Eight new RLS checks**, extending `verify:rls` in the same commit as the migration, as that
+  script asks. They prove a member may read any checklist but only write on tasks assigned to them,
+  that anon reads nothing, and that the completed stamps set and clear. All eight pass.
+- **Three new schema checks.** `checklistItemSchema` trims before testing for emptiness, which is
+  exactly the shape that caused the "check the details below" bug, so it is now covered by
+  `verify:schemas`. 23/23 idempotent.
+- Verified end to end against a signed-in user rather than by reading the diff: a task with two of
+  four items ticked renders a bar at exactly 50% with the right `progressbar` labelling, the detail
+  panel reads "Subtasks (1/2)", and a member who is *not* assigned sees the checklist read-only with
+  no add field and no remove buttons.
+
+**Known issue:** `verify:rls` must be run as the workspace's only active super admin. Its fourth
+check demotes the runner to prove the last-super-admin guard fires; with a second super admin present
+the guard correctly permits it, the runner is left a member, and ten later manager-gated checks fail
+as a consequence. That is the suite mis-reporting, not the boundary failing.
+
+**Files touched:** `supabase/migrations/0018_task_checklist.sql`,
+`src/features/tasks/{schema,queries,actions}.ts`,
+`src/features/tasks/components/{task-board,task-checklist}.tsx`,
+`src/app/(app)/tasks/[id]/page.tsx`, `scripts/{verify-rls.mjs,verify-schemas.ts}`
+
+**Migration:** 0018_task_checklist.sql — applied
+
 
 ### 2026-09-25 — Tasks: Kanban by default, on the reference design
 

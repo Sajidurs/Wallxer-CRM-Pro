@@ -34,10 +34,13 @@ import {
   resourceLinkSchema,
 } from "../src/features/shared/resource-links/schema";
 import {
+  checklistItemSchema,
   deleteTaskSchema,
   moveTaskSchema,
+  removeChecklistItemSchema,
   taskFiltersSchema,
   taskSchema,
+  toggleChecklistItemSchema,
   updateTaskSchema,
 } from "../src/features/tasks/schema";
 import {
@@ -205,6 +208,24 @@ const cases: Case[] = [
     name: "moveTaskSchema",
     schema: moveTaskSchema,
     input: { id: UUID, status: "review", position: 1500 },
+  },
+  {
+    // The trim runs before the emptiness check, so a padded title has to
+    // survive a second pass at its trimmed length rather than being re-trimmed
+    // into something the refine then rejects.
+    name: "checklistItemSchema",
+    schema: checklistItemSchema,
+    input: { taskId: UUID, title: "  Draft the homepage copy  " },
+  },
+  {
+    name: "toggleChecklistItemSchema",
+    schema: toggleChecklistItemSchema,
+    input: { id: UUID, isDone: true },
+  },
+  {
+    name: "removeChecklistItemSchema",
+    schema: removeChecklistItemSchema,
+    input: { id: UUID },
   },
   {
     name: "taskFiltersSchema",
