@@ -154,6 +154,91 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-25 — Performance: pages were taking seconds
+
+**Fixed**
+
+Reported from real use. Measured before touching anything, on production: `/dashboard` 3.4–4.0s,
+`/tasks` 2.3s, and `/api/health` — which touches no database at all — 880ms. Two structural causes.
+
+- **Vercel functions ran in `sin1` (Singapore) while Supabase is in `ap-northeast-2` (Seoul)**, so
+  every query crossed that gap. `vercel.json` pins the functions to `icn1`. Confirmed by the
+  response header `X-Vercel-Id: sin1::icn1::…`, whose second segment is the execution region.
+- **`requireUser()` ran twice per page** — once in the `(app)` layout, once in the page inside it —
+  and each call made its own `getUser()` round trip, its own `profiles` select, and its own
+  `touch_last_seen` RPC. Seven sequential calls to Seoul before a page began fetching its own data.
+  `getCurrentUser` is now wrapped in React `cache()`.
+- `touch_last_seen` was a round trip on every load even though the database throttles the write to
+  once per five minutes. The profile already says when it last happened, so the call is skipped
+  unless it would write something.
+- The same per-request memo now covers the option lists a layout and its page both read: brands,
+  assignable users, contacts, projects, pipelines, stages, and workspace settings.
+
+**Result:** 1.7–4.0s per page before, ~450–620ms steady state after, with a ~1.5s worst cold start.
+Measured the same way both times.
+
+**Files touched:** `vercel.json`, `src/lib/auth.ts`,
+`src/features/{brands,users,contacts,projects,pipeline}/queries.ts`
+
+**Migration:** none
+
+**Notes:**
+
+- `cache()` is a **per-request** memo, not a cross-request cache. A suspended user is still denied
+  on their very next navigation, and RLS is unaffected.
+- A first measurement appeared to show 76–95ms pages. That was wrong: it took the minimum of three
+  runs against a warm lambda. Re-measured with cold and warm separated, and asserting the response
+  actually contained the page — a 307 redirect is fast too.
+- What remains is about two auth round trips per request, one in the proxy and one in the page. The
+  project uses legacy HS256 tokens, so `getClaims()` cannot verify locally and would not help.
+  Migrating the project to asymmetric JWT signing keys would remove both, and is the next
+  meaningful step if 500ms is still too slow.
+
+### 2026-09-25 — Backups, and a credential key that could be read silently
+
+**Added**
+
+- `npm run backup`: a logical backup of every table, the auth user list, a storage inventory, and
+  the credential encryption key, into `backups/<timestamp>/`. `backups/` is gitignored.
+- `RESTORE.md`: what a backup holds, what it does not, and how to restore into the same project or
+  a new one — including the two triggers that fire during a load and produce noise.
+
+**Security**
+
+- **Migration `0017` revokes `credential_key()` from `service_role`.** `0006` revoked it from
+  public, anon and authenticated, which covered every route an application user can take, but not
+  the service role — which has elevated privileges in Supabase and sits in Vercel's environment and
+  in `.env.local`. Anyone holding that key could decrypt a credential directly and leave no row in
+  `credential_access_log`.
+
+  That made a claim in the Phase 3 notes wrong: "a reveal that succeeds is always a reveal that was
+  recorded" held for users and not for a leaked service-role key. It holds now. The security definer
+  functions are unaffected — they run as their owner, so `reveal_credential` still decrypts and
+  still logs first. Verified both directions.
+
+**Fixed**
+
+- An earlier entry called `activity_log` "the fourth and last shared subsystem". It is the third;
+  `comments` is still unbuilt.
+
+**Files touched:** `supabase/migrations/0017_lock_credential_key.sql`, `scripts/backup.mjs`,
+`RESTORE.md`, `package.json`, `.gitignore`
+
+**Migration:** `0017_lock_credential_key.sql`, applied to `wjtokyywsuummyaumyty`.
+
+**Notes:**
+
+- Neither `pg_dump` nor Docker is installed on the dev machine, so `supabase db dump` cannot run.
+  The script uses Node and the service role instead, which is what is actually available.
+- **The backup contains the key that decrypts every stored client password.** That is deliberate:
+  without it those rows are unrecoverable by anyone. It also means the output is exactly as
+  sensitive as the passwords themselves.
+- Because `0017` revoked the key from the service role, the backup reads it through the Management
+  API, which runs as `postgres` and needs `SUPABASE_ACCESS_TOKEN` — a different credential from the
+  one the app runs on.
+- The schema is deliberately not in the backup. It is in `supabase/migrations`, in git.
+- Nothing schedules this. It is a manual weekly job until someone sets a reminder.
+
 ### 2026-09-25 — Phase 6, Dashboard
 
 **Added**
