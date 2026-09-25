@@ -157,6 +157,51 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-25 — Page transitions
+
+**Added**
+
+Navigating between pages now crossfades instead of cutting. Built on React's `<ViewTransition>`,
+which Next 16 supports in the App Router with no configuration.
+
+- **`PageTransition`** wraps the content area in `(app)/layout.tsx`. The sidebar and topbar sit
+  outside it, so they hold still and only the content moves — the page changed, not the viewport.
+- The old page leaves in 120ms, the new one fades in over 200ms after an 80ms beat and rises 8px
+  over 300ms. Asymmetric on purpose: old content should stop competing for attention quickly, new
+  content should arrive gently enough to register.
+- **Reduced motion** collapses every duration to zero, which is the browser's own instant swap.
+- `::view-transition { pointer-events: none }` so a click during the animation still lands.
+
+**Notes:**
+
+- **The `key` is load-bearing.** Layouts persist across navigations, so a `<ViewTransition>` placed
+  in one never unmounts and never fires enter or exit. Keying on `usePathname()` makes React treat
+  the old and new page as an exit/enter pair — the mechanism the Next guide uses for same-route
+  crossfades.
+- **One wrapper element, deliberately.** `<ViewTransition>` names every DOM child it is handed, and
+  these pages return fragments of several sections. The first version produced four groups —
+  `page-content`, `_1`, `_2`, `_3` — so each section morphed into whatever section happened to
+  occupy the same slot on the next page. A header morphing into a header is harmless; a stat strip
+  morphing into a filter bar is not. Wrapping in a single `div` gives one group and one crossfade.
+- **`height: auto` on the snapshots.** Pages differ in height, and by default each snapshot is
+  stretched to the group's interpolated box, which reads as the page being squashed rather than
+  crossfaded.
+- The root snapshot still crossfades at the browser's 250ms default. That is the sidebar, and it
+  makes the active-row highlight change smoothly, so it was left alone.
+- **Verified in a real browser, not by reading the diff.** Drove headless Edge over the DevTools
+  Protocol — no new dependency, since Node 24 has a native `WebSocket` — signed in, clicked a
+  sidebar link, and captured `document.getAnimations()` while the transition was in flight. It
+  reports one `page-content` group at 260ms with `page-fade` at 120/200ms and `page-rise` at 300ms,
+  which is exactly what the CSS asks for. That capture is also what caught the four-group bug above;
+  the first run showed `page-content_1` through `_3` and it would not have been visible in the diff.
+  Re-ran with `prefers-reduced-motion: reduce` emulated and every duration reported 0ms.
+
+**Files touched:** `src/components/layout/page-transition.tsx`, `src/app/(app)/layout.tsx`,
+`src/app/globals.css`
+
+**Migration:** none
+
+
 ### 2026-09-25 — Subtask checklists, and a progress bar that means something
 
 **Added**

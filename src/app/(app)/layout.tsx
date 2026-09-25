@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { PageTransition } from "@/components/layout/page-transition";
 import { Topbar } from "@/components/layout/topbar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { requireUser } from "@/lib/auth";
@@ -65,7 +66,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             area is generous but bounded; text running the width of a 27in
             monitor is not calm, it is just wide. */}
         <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-6 py-8">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </main>
       </SidebarInset>
     </SidebarProvider>

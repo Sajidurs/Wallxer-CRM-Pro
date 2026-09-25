@@ -149,3 +149,72 @@
     @apply font-sans;
   }
 }
+/* ---------------------------------------------------------------------------
+   Page transitions
+   ---------------------------------------------------------------------------
+   Driven by <PageTransition>, which names the content area `page-content` and
+   tags its pair with the `page-swap` class. See the Next guide at
+   node_modules/next/dist/docs/01-app/02-guides/view-transitions.md.
+
+   The timing is asymmetric on purpose: the old page leaves quickly so it stops
+   competing for attention, and the new one arrives a beat later so there is
+   something to register. Rising a few pixels reads as arrival without moving
+   far enough to track. */
+
+::view-transition-group(.page-swap) {
+  animation-duration: 260ms;
+}
+
+/* Pages are not the same height. The group interpolates between the old and
+   new box, and by default each snapshot is stretched to fill it — which reads
+   as the page being squashed rather than crossfaded. `height: auto` keeps each
+   snapshot at its own natural size while the group moves. */
+::view-transition-old(.page-swap),
+::view-transition-new(.page-swap) {
+  height: auto;
+  overflow: clip;
+}
+
+::view-transition-old(.page-swap) {
+  animation: 120ms ease-in both page-fade reverse;
+}
+
+::view-transition-new(.page-swap) {
+  animation:
+    200ms ease-out 80ms both page-fade,
+    300ms cubic-bezier(0.16, 1, 0.3, 1) both page-rise;
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes page-rise {
+  from {
+    transform: translateY(8px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* The transition overlay swallows pointer events while it runs, which loses
+   clicks made mid-animation. Let them through to the live page. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* Motion is the part that causes trouble, so remove it rather than the app. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
