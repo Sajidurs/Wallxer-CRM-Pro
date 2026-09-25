@@ -1,19 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Manrope } from "next/font/google";
 
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+/**
+ * Manrope is the only typeface the app loads.
+ *
+ * `next/font` self-hosts it, so there is no request to Google at runtime and no
+ * layout shift while it arrives. The variable is read by `--font-sans` in
+ * globals.css; exposing one that nothing consumes is how the previous font
+ * ended up being downloaded on every page and never rendered.
+ */
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -30,7 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${manrope.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full">

@@ -7,9 +7,15 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  /* Manrope is the only loaded typeface. `--font-sans` used to be defined as
+     var(--font-sans), which resolves to nothing, so the previous font was
+     downloaded on every page and never applied. */
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  /* Manrope has no monospace cut, and the places that use font-mono are the
+     ones where it matters most: revealed passwords, usernames, project codes.
+     Falls back to the system monospace stack, which downloads nothing. */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);

@@ -155,6 +155,34 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-25 — Manrope, and a font that was never actually applied
+
+**Changed**
+
+- Manrope is now the only typeface the app loads, self-hosted by `next/font`.
+
+**Fixed**
+
+- **The previous font was downloaded on every page load and never rendered.** `globals.css` defined
+  `--font-sans: var(--font-sans)` — a variable pointing at itself, which resolves to nothing —
+  while the layout exposed `--font-geist-sans`, a name nothing read. So Geist Sans and Geist Mono
+  were both fetched and both ignored, and the UI rendered in the browser's default system font the
+  whole time. Switching to Manrope is therefore a visible change, not a subtle one.
+
+**Notes:**
+
+- `--font-mono` is deliberately **not** Manrope. Manrope has no monospace cut, and the places using
+  `font-mono` are the ones where character shape matters most: a revealed credential password, a
+  username, a project code. It falls back to the system monospace stack, which downloads nothing.
+- Verified against the served stylesheet rather than the source: the `html` rule carries
+  `var(--font-manrope)`, the variable is defined on the element, headings match, `font-mono` is
+  still a monospace stack, and exactly one font file is served.
+
+**Files touched:** `src/app/layout.tsx`, `src/app/globals.css`
+
+**Migration:** none
+
+
 ### 2026-09-25 — Phase 7 begins: CSV import for contacts
 
 **Added**
