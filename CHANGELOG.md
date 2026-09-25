@@ -118,6 +118,7 @@ the application-layer fallback that was not taken. `SENTRY_DSN` is Phase 7.
 | `npm run bootstrap:admin`  | Creates or promotes a super admin                        |
 | `npm run verify:rls`       | Asserts the policies hold. Needs `CHECK_EMAIL` and `CHECK_PASSWORD` |
 | `npm run verify:schemas`   | Asserts every Zod schema is idempotent. Run after touching one     |
+| `npm run backup`           | Logical backup to `backups/<timestamp>/`. See RESTORE.md            |
 | `curl <url>/api/health`    | Says which commit is actually deployed                             |
 
 ---
@@ -157,8 +158,9 @@ can be commented on, and one search box finds anything.
 
 **Added**
 
-- Migration `0014_activity_log.sql`: `activity_log`, the fourth and last shared subsystem from
-  section 5.6, written by one generic trigger attached to contacts, projects, tasks, and deals.
+- Migration `0014_activity_log.sql`: `activity_log`, the **third** of the four shared subsystems in
+  section 5.6 — `comments` is still unbuilt, and an earlier draft of this entry wrongly called this
+  the last one — written by one generic trigger attached to contacts, projects, tasks, and deals.
   Adding it to a new module is a `create trigger` line.
 - Migration `0015_dashboard_views.sql`: five views — counts, deals by stage, projects at risk,
   recent activity, my tasks.
@@ -794,8 +796,11 @@ than the bug itself.
 | 2026-09-25 | The task calendar view from §8.5 is not built. List, board, and due-window filters cover the same ground for now. | Low | Open, deferred |
 | 2026-09-25 | Priority sorting happens in JavaScript after fetching a page, because `task_priority` is an enum and Postgres orders enums by declaration. Correct within a page, wrong across pages. Needs a `priority_weight` column if it matters. | Low | Open |
 | 2026-09-25 | v1 assigns one person per task. The junction table supports many, and the UI does not. | Low | Open, by design |
-| 2026-09-24 | No SMTP. The email-invite path is written but has never been executed, and password-reset-by-email does not exist. Temporary passwords cover both for now.     | Medium   | Open, needs custom SMTP                 |
-| 2026-09-24 | No backups configured. The free tier's are limited, and §10 calls this the one gap that can actually hurt.                                                     | Medium   | Open, needs a weekly `pg_dump` reminder |
+| 2026-09-24 | No SMTP. The email-invite path is written but has never been executed, and password-reset-by-email does not exist. Temporary passwords cover both. **Deferred by the owner on 2026-09-25**; revisit when inviting people outside the Supabase org. | Low | Deferred, not blocking |
+| 2026-09-25 | A backup holds the credential encryption key in plaintext, by necessity — without it the encrypted rows are unrecoverable. The output is as sensitive as the passwords it protects, and `backups/` is gitignored. | Medium | Open by design, documented in RESTORE.md |
+| 2026-09-25 | Nothing schedules `npm run backup`. It is a manual weekly job until someone sets a reminder or a cron. | Medium | Open |
+| 2026-09-25 | Storage file *contents* are not backed up, only an inventory. Re-uploading is manual. | Low | Open |
+| 2026-09-24 | No backups configured. §10 calls this the one gap that can actually hurt.                                                                                      | Medium   | Fixed 2026-09-25, `npm run backup`      |
 | 2026-09-24 | Not deployed, and Supabase's Site URL still pointed at localhost.                                                                                              | Medium   | Fixed 2026-09-24                        |
 | 2026-09-24 | `listUsedTags` reads up to 2,000 contacts to build the tag filter list. Fine now, wrong once the imported lists land. Replace with a distinct-tag view or a tags table when it bites. | Low | Open, revisit in Phase 7 |
 | 2026-09-24 | `listCompanyOptions` caps the "Works at" picker at 500 companies. Beyond that the picker silently omits some; it needs to become a search. | Low | Open, revisit when it matters |

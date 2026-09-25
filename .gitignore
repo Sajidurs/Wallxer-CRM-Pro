@@ -44,3 +44,6 @@ supabase/.branches
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local backups — contain the credential encryption key
+/backups

@@ -1,0 +1,29 @@
+-- 0017_lock_credential_key.sql
+--
+-- Tightens a gap in 0006 that a backup audit found.
+--
+-- `credential_key()` was revoked from public, anon and authenticated, which
+-- covered every path an application user can take. It was never revoked from
+-- `service_role`, which in Supabase has elevated privileges — so anyone holding
+-- the service-role key could call it, decrypt a credential themselves, and
+-- leave no row in credential_access_log.
+--
+-- That made the claim "a reveal that succeeds is always a reveal that was
+-- recorded" true for users and false for a leaked service-role key. The service
+-- role sits in Vercel's environment and in .env.local, which is exactly the
+-- sort of secret that leaks, and it is the one case where silent decryption
+-- would matter most.
+--
+-- After this, only the database owner can read the key directly. The security
+-- definer functions are unaffected: they run as their owner, so
+-- reveal_credential still decrypts — and still writes its log row first.
+--
+-- RECOVERY NOTE: the key can still be exported deliberately, through the
+-- Supabase Management API, which runs as `postgres` and needs a personal access
+-- token rather than the service-role key. `npm run backup` does exactly that.
+-- Without the key, an encrypted credential cannot be restored from a backup by
+-- anyone, including you.
+--
+-- Forward only. Never edit once applied.
+
+revoke execute on function public.credential_key() from service_role;
