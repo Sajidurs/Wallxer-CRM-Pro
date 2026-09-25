@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, isPast } from "date-fns";
 import { AlertTriangle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -6,8 +6,10 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivityFeed } from "@/features/dashboard/components/activity-feed";
+import { AttentionCard } from "@/features/dashboard/components/attention-card";
 import { MyTasks } from "@/features/dashboard/components/my-tasks";
 import { PipelineSummary } from "@/features/dashboard/components/pipeline-summary";
+import { StatStrip } from "@/features/dashboard/components/stat-strip";
 import {
   getCounts,
   getDealsByStage,
@@ -20,8 +22,16 @@ import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
+  title: "Home",
 };
+
+/** "Good morning" is a lie at 9pm. */
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
 
 export default async function DashboardPage() {
   const profile = await requireUser();
@@ -30,73 +40,80 @@ export default async function DashboardPage() {
     getCounts(),
     getDealsByStage(),
     getProjectsAtRisk(),
-    getRecentActivity(20),
+    getRecentActivity(12),
     getMyTasks(profile.id),
   ]);
 
   const firstName = profile.full_name.split(" ")[0];
 
-  // A counter for a module this role cannot open would be a number they can
-  // read and not act on.
   const visibleCounters = COUNTERS.filter((counter) =>
     can(profile, "view", counter.resource),
   );
 
+  // The one thing worth surfacing above everything else: the most overdue
+  // project if any are late, otherwise the next task due. Nothing at all if the
+  // day is clear, because an empty callout is just noise with a border.
+  const worstProject = atRisk[0];
+  const nextTask = myTasks.find((task) => task.due_at);
+
+  const attention = worstProject
+    ? {
+        label: "Needs attention · overdue",
+        title: worstProject.name,
+        meta: [
+          `Due ${format(new Date(worstProject.due_date), "d MMM")}`,
+          `${worstProject.days_overdue} ${worstProject.days_overdue === 1 ? "day" : "days"} late`,
+        ],
+        href: `/projects/${worstProject.id}`,
+      }
+    : nextTask
+      ? {
+          label:
+            nextTask.due_at && isPast(new Date(nextTask.due_at))
+              ? "Top priority · overdue"
+              : "Next up",
+          title: nextTask.title,
+          meta: [
+            nextTask.due_at
+              ? `Due ${format(new Date(nextTask.due_at), "d MMM, HH:mm")}`
+              : "No due date",
+            nextTask.priority,
+          ],
+          href: `/tasks/${nextTask.id}`,
+        }
+      : null;
+
+  const openTasks = myTasks.length;
+
   return (
     <>
       <PageHeader
-        title={`Welcome, ${firstName}`}
-        description="What needs attention, across every brand."
+        title={`${greeting()}, ${firstName}`}
+        description={
+          openTasks === 0
+            ? `${format(new Date(), "EEEE, d MMMM")} · nothing assigned to you right now`
+            : `${format(new Date(), "EEEE, d MMMM")} · ${openTasks} ${openTasks === 1 ? "task needs" : "tasks need"} your attention`
+        }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {visibleCounters.map((counter) => {
-          const value = counts[counter.key];
-          const alarming = counter.alarming && value > 0;
+      {visibleCounters.length > 0 && (
+        <StatStrip counters={visibleCounters} counts={counts} />
+      )}
 
-          return (
-            <Link key={counter.key} href={counter.href} className="group">
-              <Card className="h-full transition-colors group-hover:border-foreground/20">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {counter.label}
-                  </CardTitle>
-                  <counter.icon
-                    className={`size-4 ${alarming ? "text-destructive" : "text-muted-foreground"}`}
-                  />
-                </CardHeader>
-                <CardContent>
-                  <div
-                    className={`text-2xl font-semibold ${alarming ? "text-destructive" : ""}`}
-                  >
-                    {value}
-                  </div>
-                  {value === 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {counter.emptyHint}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
+      {attention && <AttentionCard {...attention} />}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <ActivityFeed entries={activity} />
+      <div className="grid gap-4 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <MyTasks tasks={myTasks} userId={profile.id} />
         </div>
 
-        <div className="space-y-4">
-          <MyTasks tasks={myTasks} userId={profile.id} />
-
+        <div className="space-y-4 lg:col-span-2">
           {can(profile, "view", "deal") && <PipelineSummary stages={stages} />}
 
           {atRisk.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                   <AlertTriangle className="size-4 text-destructive" />
                   Projects at risk
                 </CardTitle>
@@ -104,7 +121,7 @@ export default async function DashboardPage() {
               <CardContent>
                 <ul className="divide-y">
                   {atRisk.map((project) => (
-                    <li key={project.id} className="py-2">
+                    <li key={project.id} className="py-2 first:pt-0 last:pb-0">
                       <Link
                         href={`/projects/${project.id}`}
                         className="text-sm font-medium hover:underline"
@@ -112,7 +129,6 @@ export default async function DashboardPage() {
                         {project.name}
                       </Link>
                       <p className="text-xs text-destructive">
-                        Due {format(new Date(project.due_date), "d MMM yyyy")} ·{" "}
                         {project.days_overdue}{" "}
                         {project.days_overdue === 1 ? "day" : "days"} overdue
                       </p>
@@ -124,6 +140,8 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
+
+      <ActivityFeed entries={activity} />
     </>
   );
 }

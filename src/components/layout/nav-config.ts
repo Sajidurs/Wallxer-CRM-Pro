@@ -26,6 +26,11 @@ export interface NavItem {
   resource: Resource;
   /** Shown greyed out with a note until the phase that builds it ships. */
   phase?: number;
+  /**
+   * Live count shown on the right of the row, Notion-style. Resolved by the
+   * layout, which already reads most of these for other reasons.
+   */
+  countKey?: "contacts" | "projects" | "tasks" | "deals";
 }
 
 export interface NavSection {
@@ -35,10 +40,10 @@ export interface NavSection {
 
 export const NAV_SECTIONS: NavSection[] = [
   {
-    label: "Workspace",
+    label: "Main menu",
     items: [
       {
-        title: "Dashboard",
+        title: "Home",
         href: "/dashboard",
         icon: LayoutDashboard,
         resource: "workspace",
@@ -48,24 +53,28 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/contacts",
         icon: Users,
         resource: "contact",
+        countKey: "contacts",
       },
       {
         title: "Pipeline",
         href: "/pipeline",
         icon: KanbanSquare,
         resource: "deal",
+        countKey: "deals",
       },
       {
         title: "Projects",
         href: "/projects",
         icon: FolderKanban,
         resource: "project",
+        countKey: "projects",
       },
       {
         title: "Tasks",
         href: "/tasks",
         icon: CheckSquare,
         resource: "task",
+        countKey: "tasks",
       },
     ],
   },

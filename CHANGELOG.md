@@ -155,6 +155,52 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-25 — Notion-style UI, first pass
+
+**Changed**
+
+Reworked the shell and the dashboard against the supplied reference. Structural, not decorative:
+the parts that change how the app reads.
+
+- **Warm neutrals.** Every colour token carried zero chroma, which is what made the UI read cold
+  and generic. They now carry a little chroma at a yellow hue: `#2d2b27` text on white, a `#f8f7f4`
+  sidebar, `#e7e6e4` hairlines. Notion's calm comes from warmth at low contrast, not from grey.
+- **Sidebar**: an off-white panel against the white page, quiet 8px rows, section labels, and live
+  counts on the right of Contacts, Pipeline, Projects and Tasks. The active row is the only white
+  surface in the panel, which is what makes it read as selected without needing a colour.
+- **Breadcrumb**, derived from the URL so every route gets one for free. Ids are dropped —
+  `/contacts/9f3e…/edit` reads as Contacts › Edit.
+- **Topbar** is now a thin, borderless strip. A rule across it cut the page in two for no reason.
+- **Page titles** are larger and tighter, with a muted line under them and no divider. Separation
+  comes from space.
+- **Cards** use a hairline border rather than a ring, with more room inside and smaller, heavier
+  titles.
+- **Table** headers recede to muted 12px; rows lose the final border, since the card already ends.
+- **Dashboard** rebuilt to the reference's shape: one inline stat strip instead of five cards, a
+  single amber callout for the most pressing thing, then a 3/2 split of tasks and pipeline, with
+  activity below.
+- Content is capped at a readable column width instead of running the full monitor.
+
+**Notes:**
+
+- The greeting follows the clock. "Good morning" at 9pm is the kind of detail that makes software
+  feel unattended.
+- The callout shows **one** item, chosen as the most overdue project or else the next task due, and
+  renders nothing when the day is clear. A list of five priorities is not a priority list, and an
+  empty callout is noise with a border.
+- The sidebar search box is present but disabled and labelled, because global search is still
+  unbuilt. A box that swallows what you type is worse than one that says it is not ready.
+- Verified that all eight routes still render and that the tokens compile to warm values — the
+  build converts oklch to hex, so the check asserts red exceeds blue rather than matching syntax.
+- **Not yet restyled:** the list and detail pages still use the old density, and the auth pages are
+  untouched. This pass covered the shell, the tokens and the dashboard.
+
+**Files touched:** `src/app/globals.css`, `src/components/layout/**`, `src/components/ui/{card,table}.tsx`,
+`src/app/(app)/{layout,dashboard/page}.tsx`, `src/features/dashboard/components/**`
+
+**Migration:** none
+
+
 ### 2026-09-25 — Manrope, and a font that was never actually applied
 
 **Changed**

@@ -1,4 +1,4 @@
-import { Separator } from "@/components/ui/separator";
+import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UserMenu } from "@/components/layout/user-menu";
 
@@ -10,14 +10,16 @@ interface TopbarProps {
 }
 
 /**
- * Sticky top bar. Global search lands here in Phase 7; the space between the
- * trigger and the user menu is deliberately left open for it.
+ * A thin, quiet bar: the path on the left, the account on the right, nothing
+ * competing with the page title below it. No border and no background — in the
+ * reference the header is simply the top of the page, and a rule across it
+ * would cut the content area in half for no reason.
  */
 export function Topbar({ fullName, email, role, avatarUrl }: TopbarProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-2 h-4" />
+    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 bg-background/80 px-4 backdrop-blur-sm">
+      <SidebarTrigger className="-ml-1 size-7 text-muted-foreground" />
+      <Breadcrumb />
 
       <div className="flex-1" />
 
