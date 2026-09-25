@@ -1,5 +1,12 @@
 import "server-only";
 
+import { cache } from "react";
+
+// Wrapped in `cache()`: a per-request memo. Several of these are read by a
+// layout and again by the page inside it, and each call was its own round trip
+// to Seoul. The first caller pays; the rest are free. Not a cross-request
+// cache — every new request re-reads, so RLS and freshness are unaffected.
+
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database.types";
 
@@ -135,17 +142,17 @@ export async function listProjectsForContact(
 }
 
 /** Projects for a picker, capped. Becomes a search when it outgrows this. */
-export async function listProjectOptions(): Promise<
-  { id: string; name: string; code: string | null }[]
-> {
-  const supabase = await createClient();
+export const listProjectOptions = cache(
+  async (): Promise<{ id: string; name: string; code: string | null }[]> => {
+    const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("projects")
-    .select("id, name, code")
-    .is("deleted_at", null)
-    .order("name", { ascending: true })
-    .limit(500);
+    const { data } = await supabase
+      .from("projects")
+      .select("id, name, code")
+      .is("deleted_at", null)
+      .order("name", { ascending: true })
+      .limit(500);
 
-  return data ?? [];
-}
+    return data ?? [];
+  },
+);

@@ -1,5 +1,12 @@
 import "server-only";
 
+import { cache } from "react";
+
+// Wrapped in `cache()`: a per-request memo. Several of these are read by a
+// layout and again by the page inside it, and each call was its own round trip
+// to Seoul. The first caller pays; the rest are free. Not a cross-request
+// cache — every new request re-reads, so RLS and freshness are unaffected.
+
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database.types";
 
@@ -168,24 +175,24 @@ export async function listCompanyOptions(): Promise<
  * than `listCompanyOptions`. Capped for the same reason: a picker returning ten
  * thousand rows is not a picker.
  */
-export async function listContactOptions(): Promise<
-  { id: string; name: string }[]
-> {
-  const supabase = await createClient();
+export const listContactOptions = cache(
+  async (): Promise<{ id: string; name: string }[]> => {
+    const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("contacts")
-    .select("id, type, first_name, last_name, company_name")
-    .is("deleted_at", null)
-    .order("company_name", { ascending: true, nullsFirst: false })
-    .order("first_name", { ascending: true, nullsFirst: false })
-    .limit(1000);
+    const { data } = await supabase
+      .from("contacts")
+      .select("id, type, first_name, last_name, company_name")
+      .is("deleted_at", null)
+      .order("company_name", { ascending: true, nullsFirst: false })
+      .order("first_name", { ascending: true, nullsFirst: false })
+      .limit(1000);
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    name: displayNameFromRow(row),
-  }));
-}
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      name: displayNameFromRow(row),
+    }));
+  },
+);
 
 /** Local copy of the naming rule, so queries do not import from schema.ts. */
 function displayNameFromRow(row: {

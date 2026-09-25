@@ -1,5 +1,12 @@
 import "server-only";
 
+import { cache } from "react";
+
+// Wrapped in `cache()`: a per-request memo. Several of these are read by a
+// layout and again by the page inside it, and each call was its own round trip
+// to Seoul. The first caller pays; the rest are free. Not a cross-request
+// cache — every new request re-reads, so RLS and freshness are unaffected.
+
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database.types";
 
@@ -10,7 +17,7 @@ export type PipelineStage = Tables<"pipeline_stages">;
 export type Deal = Tables<"deals">;
 export type DealStageHistory = Tables<"deal_stage_history">;
 
-export async function listPipelines(): Promise<Pipeline[]> {
+export const listPipelines = cache(async (): Promise<Pipeline[]>  =>{
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -22,7 +29,7 @@ export async function listPipelines(): Promise<Pipeline[]> {
   if (error) throw new Error(`Could not load pipelines: ${error.message}`);
 
   return data ?? [];
-}
+})
 
 /**
  * Stages for one pipeline.
@@ -51,7 +58,7 @@ export async function listStages(
   return data ?? [];
 }
 
-export async function listAllStages(): Promise<PipelineStage[]> {
+export const listAllStages = cache(async (): Promise<PipelineStage[]>  =>{
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -60,7 +67,7 @@ export async function listAllStages(): Promise<PipelineStage[]> {
     .order("position", { ascending: true });
 
   return data ?? [];
-}
+})
 
 /**
  * Every live deal in one pipeline, ordered for the board.
@@ -136,10 +143,10 @@ export async function dealHistory(dealId: string): Promise<DealStageHistory[]> {
 }
 
 /** The workspace's settings blob, which decides whether values are shown. */
-export async function getWorkspaceSettings(): Promise<unknown> {
+export const getWorkspaceSettings = cache(async (): Promise<unknown>  =>{
   const supabase = await createClient();
 
   const { data } = await supabase.from("workspaces").select("settings").maybeSingle();
 
   return data?.settings ?? {};
-}
+})
