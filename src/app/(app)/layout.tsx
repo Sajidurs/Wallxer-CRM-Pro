@@ -47,7 +47,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     <SidebarProvider>
       <AppSidebar
         workspaceName={workspace.data?.name ?? "Workspace"}
-        user={{ role: profile.role, status: profile.status }}
+        user={{
+          role: profile.role,
+          status: profile.status,
+          finance_access: profile.finance_access,
+        }}
         counts={{
           contacts: contacts.count ?? 0,
           projects: projects.count ?? 0,

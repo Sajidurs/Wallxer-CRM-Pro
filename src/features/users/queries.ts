@@ -24,10 +24,11 @@ export type UserRow = Pick<
   | "created_at"
   | "invited_at"
   | "must_change_password"
+  | "finance_access"
 >;
 
 const USER_COLUMNS =
-  "id, full_name, email, role, status, job_title, phone, avatar_url, last_seen_at, created_at, invited_at, must_change_password";
+  "id, full_name, email, role, status, job_title, phone, avatar_url, last_seen_at, created_at, invited_at, must_change_password, finance_access";
 
 /**
  * Everyone in the workspace. Read through the user-scoped client, so RLS

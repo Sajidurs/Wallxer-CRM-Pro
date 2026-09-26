@@ -5,6 +5,7 @@ import {
   KanbanSquare,
   LayoutDashboard,
   Palette,
+  Wallet,
   Users,
   UsersRound,
   type LucideIcon,
@@ -31,6 +32,13 @@ export interface NavItem {
    * layout, which already reads most of these for other reasons.
    */
   countKey?: "contacts" | "projects" | "tasks" | "deals";
+  /**
+   * A per-user grant rather than a role, checked with its own helper. Finance
+   * is the only one: `resource` cannot express it, because roles are
+   * cumulative and the whole point is to hand the module to one manager
+   * without also handing them user management.
+   */
+  grant?: "finance";
 }
 
 export interface NavSection {
@@ -75,6 +83,15 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: CheckSquare,
         resource: "task",
         countKey: "tasks",
+      },
+      {
+        title: "Finance",
+        href: "/finance",
+        icon: Wallet,
+        // `workspace` view is the weakest gate in the matrix; the real check is
+        // the grant below, which every role must pass.
+        resource: "workspace",
+        grant: "finance",
       },
     ],
   },

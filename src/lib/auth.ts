@@ -1,10 +1,10 @@
 import "server-only";
 
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
 import type { Role } from "@/lib/permissions";
-import { atLeast } from "@/lib/permissions";
+import { atLeast, canAccessFinance } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database.types";
 
@@ -105,6 +105,23 @@ export async function requireRole(minimum: Role): Promise<Profile> {
 
   if (!atLeast(profile.role, minimum)) {
     redirect("/dashboard");
+  }
+
+  return profile;
+}
+
+/**
+ * For the Finance module, which is a grant rather than a rank.
+ *
+ * 404 rather than a redirect to the dashboard: someone without the grant should
+ * not learn that the module exists from the way they are turned away. RLS would
+ * return them an empty ledger regardless; this stops the page rendering at all.
+ */
+export async function requireFinanceAccess(): Promise<Profile> {
+  const profile = await requireUser();
+
+  if (!canAccessFinance(profile)) {
+    notFound();
   }
 
   return profile;

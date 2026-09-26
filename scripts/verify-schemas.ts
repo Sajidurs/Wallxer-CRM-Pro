@@ -30,6 +30,12 @@ import {
   updateContactSchema,
 } from "../src/features/contacts/schema";
 import {
+  deleteTransactionSchema,
+  transactionFiltersSchema,
+  transactionSchema,
+  updateTransactionSchema,
+} from "../src/features/finance/schema";
+import {
   draftLinkSchema,
   resourceLinkSchema,
 } from "../src/features/shared/resource-links/schema";
@@ -226,6 +232,57 @@ const cases: Case[] = [
     name: "removeChecklistItemSchema",
     schema: removeChecklistItemSchema,
     input: { id: UUID },
+  },
+  {
+    // The amount arrives as whatever was typed and leaves as integer poisha.
+    // The second parse therefore receives a *number* where the first received a
+    // string, which is the exact shape that broke contact creation: a schema
+    // that only accepts its input type rejects its own output.
+    name: "transactionSchema (typed amount)",
+    schema: transactionSchema,
+    input: {
+      kind: "expense",
+      amount: "1,250.75",
+      occurredOn: "2026-09-26",
+      categoryId: UUID,
+      brandId: null,
+      projectId: null,
+      contactId: null,
+      paymentMethod: "bank_transfer",
+      reference: "",
+      description: "  Domain renewal  ",
+    },
+  },
+  {
+    name: "transactionSchema (bare amount)",
+    schema: transactionSchema,
+    input: {
+      kind: "income",
+      amount: "5000",
+      occurredOn: "2026-09-26",
+      paymentMethod: "cash",
+    },
+  },
+  {
+    name: "updateTransactionSchema",
+    schema: updateTransactionSchema,
+    input: {
+      id: UUID,
+      kind: "income",
+      amount: "৳9,999.99",
+      occurredOn: "2026-09-26",
+      paymentMethod: "mobile_banking",
+    },
+  },
+  {
+    name: "deleteTransactionSchema",
+    schema: deleteTransactionSchema,
+    input: { id: UUID, deleted: true },
+  },
+  {
+    name: "transactionFiltersSchema",
+    schema: transactionFiltersSchema,
+    input: { q: "domain", kind: "expense" },
   },
   {
     name: "taskFiltersSchema",

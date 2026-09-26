@@ -101,3 +101,32 @@ export function canManageSettings(
 ): boolean {
   return can(user, "update", "user");
 }
+
+/**
+ * Finance is a grant, not a rank.
+ *
+ * Roles here are cumulative, so expressing "the finance module" as a minimum
+ * role would mean the only way to show it to a manager is to make them an
+ * admin — which also hands them user management. Admins hold it implicitly;
+ * everyone else holds it because an admin switched it on for them.
+ *
+ * This must agree with `has_finance_access()` in migration 0019, which is the
+ * half that actually enforces it. When they disagree, the database wins and
+ * this file has a bug.
+ */
+export function canAccessFinance(
+  user:
+    | (Pick<PermissionSubject, "role" | "status"> & { finance_access?: boolean })
+    | null
+    | undefined,
+): boolean {
+  if (!user || user.status !== "active") return false;
+  return atLeast(user.role, "admin") || user.finance_access === true;
+}
+
+/** Only an admin may hand the finance module to someone else. */
+export function canGrantFinance(
+  user: Pick<PermissionSubject, "role" | "status"> | null | undefined,
+): boolean {
+  return can(user, "update", "user");
+}

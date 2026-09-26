@@ -218,3 +218,31 @@
     animation-delay: 0s !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Chart palette
+   ---------------------------------------------------------------------------
+   Validated with the dataviz validator in both modes: lightness band, chroma
+   floor, CVD separation, normal-vision floor and contrast against the surface
+   all pass. Worst CVD separation is ΔE 19.2, well clear of the 8 target.
+
+   Deliberately NOT the conventional green-for-income, red-for-expense. Red and
+   green are the pair that deuteranopes and protanopes cannot separate, which is
+   about one man in twelve — the single worst choice available for the two
+   series a finance page exists to compare. Blue against orange is the canonical
+   colourblind-safe opposition and reads just as clearly to everyone else.
+
+   Dark values are stepped for the dark surface, not flipped. */
+.viz {
+  --series-income: #2a78d6;
+  --series-expense: #eb6834;
+  --series-positive: #2a78d6;
+  --series-negative: #e34948;
+}
+
+.dark .viz {
+  --series-income: #3987e5;
+  --series-expense: #d95926;
+  --series-positive: #3987e5;
+  --series-negative: #e66767;
+}

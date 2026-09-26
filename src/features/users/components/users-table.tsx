@@ -10,7 +10,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Role } from "@/lib/permissions";
+import { atLeast, type Role } from "@/lib/permissions";
+
+import { FinanceAccessToggle } from "@/features/finance/components/finance-access-toggle";
 
 import type { UserRow } from "../queries";
 import { ROLE_LABELS, STATUS_LABELS } from "../schema";
@@ -59,6 +61,7 @@ export function UsersTable({
             <TableHead className="hidden sm:table-cell">Role</TableHead>
             <TableHead className="hidden md:table-cell">Status</TableHead>
             <TableHead className="hidden lg:table-cell">Last seen</TableHead>
+            <TableHead className="hidden sm:table-cell">Finance</TableHead>
             <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
@@ -107,6 +110,21 @@ export function UsersTable({
 
               <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
                 {lastSeenLabel(user)}
+              </TableCell>
+
+              {/* The grant that lets one manager into Finance without making
+                  them an admin. Only an admin sees a working switch; the
+                  database refuses the write from anyone else regardless. */}
+              <TableCell className="hidden sm:table-cell">
+                <FinanceAccessToggle
+                  userId={user.id}
+                  name={user.full_name}
+                  granted={user.finance_access}
+                  implicit={atLeast(user.role, "admin")}
+                  disabled={
+                    !atLeast(actorRole, "admin") || user.status === "suspended"
+                  }
+                />
               </TableCell>
 
               <TableCell>

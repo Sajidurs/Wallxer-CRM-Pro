@@ -763,6 +763,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           email: string
+          finance_access: boolean
           full_name: string
           id: string
           invited_at: string | null
@@ -781,6 +782,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email: string
+          finance_access?: boolean
           full_name: string
           id: string
           invited_at?: string | null
@@ -799,6 +801,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string
+          finance_access?: boolean
           full_name?: string
           id?: string
           invited_at?: string | null
@@ -1311,6 +1314,164 @@ export type Database = {
           },
         ]
       }
+      transaction_categories: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["transaction_kind"]
+          name: string
+          position: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          kind: Database["public"]["Enums"]["transaction_kind"]
+          name: string
+          position?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["transaction_kind"]
+          name?: string
+          position?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_categories_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_categories_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          amount_poisha: number
+          brand_id: string | null
+          category_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          description: string | null
+          id: string
+          kind: Database["public"]["Enums"]["transaction_kind"]
+          occurred_on: string
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          project_id: string | null
+          reference: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_poisha: number
+          brand_id?: string | null
+          category_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["transaction_kind"]
+          occurred_on: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          project_id?: string | null
+          reference?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount_poisha?: number
+          brand_id?: string | null
+          category_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["transaction_kind"]
+          occurred_on?: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          project_id?: string | null
+          reference?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_projects_at_risk"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string
@@ -1497,6 +1658,33 @@ export type Database = {
         Args: { p_deleted?: boolean; p_id: string }
         Returns: undefined
       }
+      finance_by_category: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          category_id: string
+          category_name: string
+          kind: Database["public"]["Enums"]["transaction_kind"]
+          total_poisha: number
+        }[]
+      }
+      finance_by_project: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          expense_poisha: number
+          income_poisha: number
+          project_id: string
+          project_name: string
+        }[]
+      }
+      finance_series: {
+        Args: { p_bucket: string; p_from: string; p_to: string }
+        Returns: {
+          bucket: string
+          expense_poisha: number
+          income_poisha: number
+        }[]
+      }
+      has_finance_access: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
@@ -1537,6 +1725,13 @@ export type Database = {
         | "other"
       deal_status: "open" | "won" | "lost"
       link_kind: "video" | "document" | "design" | "repository" | "reference"
+      payment_method:
+        | "cash"
+        | "bank_transfer"
+        | "card"
+        | "mobile_banking"
+        | "cheque"
+        | "other"
       project_status:
         | "planning"
         | "active"
@@ -1545,6 +1740,7 @@ export type Database = {
         | "cancelled"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "todo" | "in_progress" | "review" | "blocked" | "done"
+      transaction_kind: "income" | "expense"
       user_role: "super_admin" | "admin" | "manager" | "member"
       user_status: "active" | "invited" | "suspended"
     }
@@ -1691,6 +1887,14 @@ export const Constants = {
       ],
       deal_status: ["open", "won", "lost"],
       link_kind: ["video", "document", "design", "repository", "reference"],
+      payment_method: [
+        "cash",
+        "bank_transfer",
+        "card",
+        "mobile_banking",
+        "cheque",
+        "other",
+      ],
       project_status: [
         "planning",
         "active",
@@ -1700,6 +1904,7 @@ export const Constants = {
       ],
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["todo", "in_progress", "review", "blocked", "done"],
+      transaction_kind: ["income", "expense"],
       user_role: ["super_admin", "admin", "manager", "member"],
       user_status: ["active", "invited", "suspended"],
     },

@@ -19,7 +19,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { can, type Role, type UserStatus } from "@/lib/permissions";
+import { can, canAccessFinance, type Role, type UserStatus } from "@/lib/permissions";
 
 export interface NavCounts {
   contacts?: number;
@@ -30,7 +30,7 @@ export interface NavCounts {
 
 interface AppSidebarProps {
   workspaceName: string;
-  user: { role: Role; status: UserStatus };
+  user: { role: Role; status: UserStatus; finance_access: boolean };
   counts: NavCounts;
 }
 
@@ -86,8 +86,10 @@ export function AppSidebar({ workspaceName, user, counts }: AppSidebarProps) {
 
       <SidebarContent className="px-2">
         {NAV_SECTIONS.map((section) => {
-          const visible = section.items.filter((item) =>
-            can(user, "view", item.resource),
+          const visible = section.items.filter(
+            (item) =>
+              can(user, "view", item.resource) &&
+              (item.grant !== "finance" || canAccessFinance(user)),
           );
           if (visible.length === 0) return null;
 

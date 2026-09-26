@@ -1253,6 +1253,166 @@ if (!serviceKey) {
     await admin.from("activity_log").delete().eq("entity_id", loggedContact.id);
     await admin.from("contacts").delete().eq("id", loggedContact.id);
 
+    // --- finance (0019) -----------------------------------------------------
+    // Finance is a per-user grant rather than a role, so the interesting
+    // questions are different from everywhere else: can someone without it see
+    // anything, and can they give it to themselves.
+
+    const { data: probeTxn } = await admin
+      .from("transactions")
+      .insert({
+        workspace_id: workspaceId,
+        kind: "income",
+        amount_poisha: 500000,
+        occurred_on: "2026-09-01",
+        description: "__finance_probe__",
+      })
+      .select("id")
+      .single();
+
+    const anonTxns = await anon.from("transactions").select("*");
+    check(
+      "anon reads no transactions",
+      (anonTxns.data?.length ?? 0) === 0,
+      anonTxns.error ? anonTxns.error.message : `rows: ${anonTxns.data?.length}`,
+    );
+
+    const ungrantedRead = await member.from("transactions").select("id");
+    check(
+      "member without the finance grant reads nothing",
+      (ungrantedRead.data?.length ?? 0) === 0,
+      ungrantedRead.error?.message ?? `rows: ${ungrantedRead.data?.length}`,
+    );
+
+    const ungrantedHelper = await member.rpc("has_finance_access");
+    check(
+      "has_finance_access() is false without the grant",
+      ungrantedHelper.data === false,
+      String(ungrantedHelper.data),
+    );
+
+    // The attack the column exists to stop: profiles_update_self_or_admin lets
+    // anyone edit their own row, so without the guard this is a one-line
+    // privilege escalation into the company's books.
+    const selfGrant = await member
+      .from("profiles")
+      .update({ finance_access: true })
+      .eq("id", memberId)
+      .select("id");
+    check(
+      "member cannot grant themselves finance access",
+      !!selfGrant.error,
+      selfGrant.error?.message ?? "NO ERROR — a member self-granted finance",
+    );
+
+    const { data: stillFalse } = await admin
+      .from("profiles")
+      .select("finance_access")
+      .eq("id", memberId)
+      .single();
+    check(
+      "and the flag really is still false",
+      stillFalse?.finance_access === false,
+      String(stillFalse?.finance_access),
+    );
+
+    const ungrantedWrite = await member.from("transactions").insert({
+      workspace_id: workspaceId,
+      kind: "expense",
+      amount_poisha: 100,
+      occurred_on: "2026-09-02",
+      description: "__finance_probe_denied__",
+    });
+    check(
+      "member without the grant cannot write to the ledger",
+      !!ungrantedWrite.error,
+      ungrantedWrite.error?.message ?? "NO ERROR — ungranted member wrote a transaction",
+    );
+
+    // A dedicated admin rather than `user`. The self-demote check above leaves
+    // the signed-in runner a member whenever a second super admin exists, and
+    // an ungranted member obviously cannot grant anything — which would make
+    // this check report a hole that is not there.
+    const grantAdminEmail = `finance-grantor-${Date.now()}@example.com`;
+    const grantAdminPassword = `Probe!${Math.random().toString(36).slice(2)}Aa1`;
+    const { data: grantAdmin } = await admin.auth.admin.createUser({
+      email: grantAdminEmail,
+      password: grantAdminPassword,
+      email_confirm: true,
+      user_metadata: { full_name: "Finance Grantor", role: "admin" },
+    });
+    await admin
+      .from("profiles")
+      .update({ role: "admin", status: "active", must_change_password: false })
+      .eq("id", grantAdmin.user.id);
+
+    const grantor = createClient(url, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    await grantor.auth.signInWithPassword({
+      email: grantAdminEmail,
+      password: grantAdminPassword,
+    });
+
+    const grant = await grantor
+      .from("profiles")
+      .update({ finance_access: true })
+      .eq("id", memberId)
+      .select("finance_access");
+    check(
+      "an admin can grant finance access",
+      !grant.error && grant.data?.[0]?.finance_access === true,
+      grant.error?.message ?? JSON.stringify(grant.data),
+    );
+
+    const grantedRead = await member.from("transactions").select("id");
+    check(
+      "the granted member now reads the ledger",
+      (grantedRead.data?.length ?? 0) >= 1,
+      grantedRead.error?.message ?? `rows: ${grantedRead.data?.length}`,
+    );
+
+    // The report functions are deliberately not security definer. If they were,
+    // they would hand the whole ledger to anyone who could call them.
+    await grantor.from("profiles").update({ finance_access: false }).eq("id", memberId);
+    const revokedReport = await member.rpc("finance_series", {
+      p_from: "2026-01-01",
+      p_to: "2026-12-31",
+      p_bucket: "month",
+    });
+    check(
+      "revoking the grant closes the report functions too",
+      (revokedReport.data?.length ?? 0) === 0,
+      revokedReport.error?.message ?? `rows: ${revokedReport.data?.length}`,
+    );
+
+    const hardDeleteTxn = await user
+      .from("transactions")
+      .delete()
+      .eq("id", probeTxn.id)
+      .select("id");
+    check(
+      "not even an admin can hard delete a transaction",
+      (hardDeleteTxn.data?.length ?? 0) === 0,
+      hardDeleteTxn.error?.message ?? `rows deleted: ${hardDeleteTxn.data?.length}`,
+    );
+
+    const negativeAmount = await admin.from("transactions").insert({
+      workspace_id: workspaceId,
+      kind: "income",
+      amount_poisha: -5,
+      occurred_on: "2026-09-01",
+      description: "__finance_probe_negative__",
+    });
+    check(
+      "a negative amount is refused",
+      !!negativeAmount.error,
+      negativeAmount.error?.message ?? "NO ERROR — negative amount accepted",
+    );
+
+    await admin.from("transactions").delete().like("description", "__finance_probe%");
+    await admin.auth.admin.deleteUser(grantAdmin.user.id);
+
     // Suspension must deny immediately, without deleting anything.
     await admin.from("profiles").update({ status: "suspended" }).eq("id", memberId);
 

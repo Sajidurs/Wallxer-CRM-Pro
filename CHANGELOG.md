@@ -96,6 +96,8 @@ Update this file at the end of every work session, before you stop.
 | `0016_fix_activity_label.sql` | Yes, 2026-09-25            |
 | `0017_lock_credential_key.sql` | Yes, 2026-09-25          |
 | `0018_task_checklist.sql` | Yes, 2026-09-25                |
+| `0019_finance.sql`     | Yes, 2026-09-26                   |
+| `0020_restore_profile_guard.sql` | Yes, 2026-09-26         |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -156,6 +158,90 @@ can be commented on, and one search box finds anything.
 ---
 
 ## Unreleased
+
+### 2026-09-26 — Finance: income, expenses, and the reports built on them
+
+**Added**
+
+The module SYSTEM_DESIGN section 11 sketched as "a new `transactions` table, `brand_id` and
+`project_id` foreign keys, new feature folder". Admin-only to begin with, grantable to anyone
+afterwards without a deploy.
+
+- **`transactions`** (migration 0019) — kind, amount, date, category, payment method, reference and
+  note, linked to a brand, project and client so per-project profit falls out of the same rows.
+- **`transaction_categories`**, per kind and seeded with fourteen sensible defaults, so the first
+  form is not an empty dropdown. Editable, deactivatable, nothing load bearing.
+- **A report page** with weekly, monthly and yearly granularity: income against expense over time,
+  where the money went and where it came from by category, and profit by project.
+- **The ledger** at `/finance/transactions`, with a record form and soft delete.
+- **A Finance switch on each user in Settings → Users**, which is the whole point of the design
+  below.
+
+**Access is a grant, not a rank**
+
+Roles here are cumulative, so "let my manager see Finance" expressed as a role would mean promoting
+them to admin — which also hands them user management. So `profiles.finance_access` is an exception
+list: admins and super admins hold the module implicitly, anyone else holds it because an admin
+switched it on. `has_finance_access()` enforces it in every policy; `canAccessFinance()` mirrors it
+for the UI, and when they disagree the database wins.
+
+`/finance` returns **404** rather than redirecting. Someone without the grant should not learn the
+module exists from the way they are turned away.
+
+**Fixed**
+
+- **0019 silently un-did three protections, and 0020 puts them back.**
+  `guard_profile_privileged_columns` is defined in three migrations now: 0002 created it, 0003
+  replaced it with an extended version, and 0019 needed one more check. 0019 rebuilt it from
+  **0002's** body, which dropped everything 0003 had added — `must_change_password` became
+  client-writable (so anyone handed a temporary password could skip the forced change), invite
+  provenance stopped being write-once, and an admin could suspend themselves again.
+  `create or replace function` has no notion of merging into a base version; it takes the body it is
+  handed. Anything replacing a function from an earlier migration has to start from the newest
+  definition, and the only way to know which that is, is to grep for every occurrence.
+  `verify:rls` caught it: "member cannot set must_change_password" started failing in the same run
+  that added the finance checks.
+
+**Notes:**
+
+- **Money is integer poisha, never a float.** `0.1 + 0.2` is not `0.3`, and a ledger that disagrees
+  with itself by a poisha a row is worse than one that is tedious to type. The sign lives in `kind`,
+  so the amount is always positive and a check constraint refuses zero, negatives, and the extra
+  zeroes of a typo.
+- **Taka is formatted with `en-IN` grouping and a hand-applied ৳.** `en-BD` returns Western grouping
+  and the string "BDT"; `bn-BD` returns Bengali digits. Only `en-IN` gives ৳1,00,00,000 for a crore,
+  which is how the number is read here.
+- **The report functions are deliberately not `security definer`.** They run as the caller, so the
+  policies filter them. A security-definer aggregate would have been a hole straight past the grant
+  — which is why one of the checks revokes access and asserts the *report* closes too.
+- **The charts are not green-for-income, red-for-expense.** Red and green are precisely the pair
+  that protanopes and deuteranopes cannot separate — about one man in twelve — which makes it the
+  worst available choice for the two series this page exists to compare. Blue against orange is the
+  canonical colourblind-safe opposition. The palette was checked with the data-visualisation
+  validator rather than by eye: lightness band, chroma floor, CVD separation, normal-vision floor
+  and contrast all pass in both modes, worst CVD ΔE 19.2 against a target of 8. Every chart also
+  carries a legend, direct labels and a table view, so nothing is reachable only by reading a bar.
+- **13 new RLS checks and 5 new schema checks**, added in the same commit as the migration. They
+  prove an ungranted member reads nothing and cannot write, that the report functions close when
+  access is revoked, that nobody can hard delete a transaction, and — the one the column exists for
+  — that a member cannot grant themselves finance access. `verify:schemas` covers the amount
+  transform, which turns a typed string into an integer and so is exactly the shape that caused the
+  "check the details below" bug.
+- Verified end to end against the production build as three different signed-in users: an ungranted
+  member gets 404 and no nav row, an admin sees ৳4,00,000 income and ৳3,10,000 net computed from
+  real rows, and granting the member opens both the page and the nav row. 21 of 21.
+- **Not included:** invoices, budgets, multi-currency and recurring entries, by decision. Also no
+  activity-log rows for transactions — `log_activity` is shared by every table and broke production
+  once already in 0016, so extending it deserves its own change rather than riding along with this
+  one. Transactions carry `created_by`, `updated_at` and soft delete meanwhile.
+
+**Files touched:** `supabase/migrations/{0019_finance,0020_restore_profile_guard}.sql`,
+`src/features/finance/**`, `src/app/(app)/finance/**`, `src/lib/{money,permissions,auth}.ts`,
+`src/components/layout/{nav-config,app-sidebar}.tsx`, `src/features/users/**`,
+`src/app/globals.css`, `scripts/{verify-rls.mjs,verify-schemas.ts}`
+
+**Migration:** 0019_finance.sql and 0020_restore_profile_guard.sql — both applied
+
 
 ### 2026-09-25 — Page transitions
 
