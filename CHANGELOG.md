@@ -159,6 +159,40 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-26 — September ledger imported from the spreadsheet
+
+**Data, not code.** Twelve rows from the supplied sheet, recorded against the Finance module. Noted
+here because several of the choices are not recoverable from looking at the rows afterwards.
+
+- **The sheet's own categories were created, not mapped onto the seeded defaults**: income *Design
+  Services* and *Salary*, expense *Salary*, *Tools* and *Domain and Hosting*. The reports then read
+  in the same words the sheet used. `Salary` exists under both kinds — an outgoing wage and the
+  incoming Boost salary — which the `(workspace, kind, name)` unique index allows by design.
+- This leaves the fourteen seeded defaults sitting unused beside them, including a near-duplicate
+  *Salaries*. **There is no UI to rename or deactivate a category yet** — `createCategory` exists in
+  the actions with no caller, the same gap that has now appeared four times.
+- **The sheet's "Client / Vendor" column leads the description**, as `belinda — Ecommerce function`,
+  because `transactions` has no counterparty column. Only *Julie* matched an existing contact and is
+  linked to it; the rest are vendors like Google and a hosting provider, and creating a contact for
+  each would fill the CRM with them.
+- **Payment method is "Other" on every row.** The sheet does not record how anything was paid, and
+  defaulting to Bank transfer would have asserted something nobody said.
+- The category reads `Doman and Hosti…` in the sheet, truncated and misspelled; it was entered as
+  **Domain and Hosting**.
+- Every row was parsed with the real `transactionSchema` before being written, so nothing was stored
+  that the form would have rejected — section 8.2's rule for CSV import applies to a hand-run import
+  too.
+- An existing ৳3,000 expense dated 2026-09-26 was already in the ledger and was left alone. The
+  first version of the import refused to run because of it; the duplicate check now compares against
+  the rows it is about to write rather than against the whole month.
+
+Sheet totals: income ৳1,02,000, expense ৳24,500. With the pre-existing entry the module reports
+income ৳1,02,000, expense ৳27,500, net ৳74,500 — confirmed by rendering the page as a signed-in
+admin, not by reading the insert.
+
+**Migration:** none
+
+
 ### 2026-09-26 — Finance: income, expenses, and the reports built on them
 
 **Added**
