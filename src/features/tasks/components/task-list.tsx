@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/table";
 
 import type { TaskListItem } from "../queries";
+import { Person, type PersonInfo } from "@/components/common/person";
+
 import { TaskActions } from "./task-actions";
 import {
   TASK_PRIORITY_LABELS,
@@ -23,7 +25,7 @@ import {
 
 interface TaskListProps {
   tasks: TaskListItem[];
-  people: Record<string, string>;
+  people: Record<string, PersonInfo>;
   projects: Record<string, string>;
   linkCounts: Record<string, number>;
   /** Editing depends on assignment, so it is decided per row. */
@@ -131,7 +133,11 @@ export function TaskList({
                 </TableCell>
 
                 <TableCell className="hidden text-sm lg:table-cell">
-                  {assignee ?? <span className="text-muted-foreground">Unassigned</span>}
+                  {assignee ? (
+                    <Person person={assignee} />
+                  ) : (
+                    <span className="text-muted-foreground">Unassigned</span>
+                  )}
                 </TableCell>
 
                 <TableCell className="hidden sm:table-cell">

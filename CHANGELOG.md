@@ -99,6 +99,7 @@ Update this file at the end of every work session, before you stop.
 | `0019_finance.sql`     | Yes, 2026-09-26                   |
 | `0020_restore_profile_guard.sql` | Yes, 2026-09-26         |
 | `0021_member_permissions.sql` | Yes, 2026-09-26            |
+| `0022_avatar_cleanup.sql` | Yes, 2026-09-26                |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -159,6 +160,57 @@ can be commented on, and one search box finds anything.
 ---
 
 ## Unreleased
+
+### 2026-09-26 — Profile photos, and faces on the task pages
+
+**Added**
+
+- **Upload a profile photo** from Settings → Your profile. PNG, JPEG or WebP up to 2 MB, with a
+  preview, a Change, and a Remove.
+- **`/api/avatar`** — a route handler rather than a server action, for the same reason as
+  `/api/upload`: a server action serialises its arguments through the RSC protocol, which is a poor
+  way to move a binary.
+- **Faces on the task pages**: the assignee's photo beside their name in the list and on the detail
+  page, and as a stack on each board card.
+- **`PersonAvatar` and `Person`** in `components/common`, so the board, the list and the detail page
+  all fall back to initials the same way instead of three near-copies.
+
+**Notes:**
+
+- **Nothing new was provisioned.** 0008 had already created a private `avatars` bucket with a 2 MB
+  cap, a png/jpeg/webp allow-list, and select/insert/update policies scoped to the workspace by the
+  first path segment. This was wiring, not infrastructure.
+- **The bucket is private, so `avatar_url` holds a storage path and not a URL** — SYSTEM_DESIGN 7.4
+  rules out public URLs. Links are signed on read, batched with `createSignedUrls` and memoised per
+  request: one round trip for every face on a page, rather than one per card. The column name
+  predates the decision and now carries a comment saying so.
+- **Migration 0022 adds the delete policy 0008 left out.** Without it a replaced photo stayed in
+  storage for ever — nothing referenced it, nothing could remove it, and the quota only ever went
+  up. The path is `{workspace}/{user}/{uuid}.{ext}`, so the second segment is what makes "your own
+  photo" expressible in a policy.
+- **Order matters in the upload.** The object is written first, then the profile row; if the row
+  fails the object is removed again, and the previous photo is deleted only once the row points at
+  the new one. Losing the old file is harmless; losing the new one before the row is written is not.
+- The upload control sits above the profile form rather than inside it, because it saves on
+  selection. Nesting it would make Save look responsible for a change that already happened.
+- **Verified in a real browser, not from the HTML.** Radix's Avatar only mounts the `<img>` once it
+  has loaded on the client, so a server-rendered page never contains the `src` — a check against the
+  markup would have said "no photo" on a page that shows one. Driving headless Edge and asserting
+  `naturalWidth > 0` confirms the photo decoded on the board, the list, the detail page, the profile
+  page and the topbar. 7 of 7, plus 21 of 23 on the route itself.
+- Two of those 23 were the assertions being wrong rather than the code: a logged-out upload returns
+  **307** and not 401, because the proxy turns away unauthenticated requests before the handler runs
+  — the same behaviour `/api/upload` has always had.
+- **Photos are self-service.** An admin cannot set someone else's, which matches every user having
+  their own login. Say so if it should be otherwise.
+
+**Files touched:** `supabase/migrations/0022_avatar_cleanup.sql`, `src/app/api/avatar/route.ts`,
+`src/features/users/{avatars.ts,components/avatar-upload.tsx,queries.ts,components/users-table.tsx}`,
+`src/components/common/person.tsx`, `src/features/tasks/components/{task-board,task-list}.tsx`,
+`src/app/(app)/{layout,tasks/page,tasks/[id]/page,settings/profile/page,settings/users/page}.tsx`
+
+**Migration:** 0022_avatar_cleanup.sql — applied
+
 
 ### 2026-09-26 — Members run the work; Settings belongs to admins
 

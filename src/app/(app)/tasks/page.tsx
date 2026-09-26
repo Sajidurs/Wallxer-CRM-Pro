@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
+import type { PersonInfo } from "@/components/common/person";
 import { Pagination } from "@/components/common/pagination";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { TaskFilters } from "@/features/tasks/components/task-filters";
 import { TaskList } from "@/features/tasks/components/task-list";
 import { listBoardTasks, listTasks } from "@/features/tasks/queries";
 import { taskFiltersSchema } from "@/features/tasks/schema";
+import { signAvatars } from "@/features/users/avatars";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -50,7 +52,16 @@ export default async function TasksPage(props: PageProps<"/tasks">) {
     tasks.map((task) => task.id),
   );
 
-  const peopleById = Object.fromEntries(people.map((p) => [p.id, p.name]));
+  // One batch of signed URLs for every face on the page, rather than one
+  // Storage round trip per card.
+  const avatars = await signAvatars(people.map((p) => p.avatarPath));
+
+  const peopleById: Record<string, PersonInfo> = Object.fromEntries(
+    people.map((p) => [
+      p.id,
+      { name: p.name, avatarUrl: p.avatarPath ? (avatars.get(p.avatarPath) ?? null) : null },
+    ]),
+  );
   const projectsById = Object.fromEntries(projects.map((p) => [p.id, p.name]));
   const linkCounts = Object.fromEntries(
     [...links.entries()].map(([taskId, list]) => [taskId, list.length]),

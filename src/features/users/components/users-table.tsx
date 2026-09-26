@@ -20,6 +20,8 @@ import { UserRowActions } from "./user-row-actions";
 
 interface UsersTableProps {
   users: UserRow[];
+  /** Signed URLs by storage path; the bucket is private. */
+  avatars: Map<string, string>;
   actorId: string;
   actorRole: Role;
   activeSuperAdmins: number;
@@ -48,6 +50,7 @@ function lastSeenLabel(user: UserRow) {
 
 export function UsersTable({
   users,
+  avatars,
   actorId,
   actorRole,
   activeSuperAdmins,
@@ -71,7 +74,9 @@ export function UsersTable({
               <TableCell>
                 <div className="flex items-center gap-3">
                   <Avatar className="size-8">
-                    {user.avatar_url && <AvatarImage src={user.avatar_url} alt="" />}
+                    {user.avatar_url && avatars.get(user.avatar_url) && (
+                      <AvatarImage src={avatars.get(user.avatar_url)} alt="" />
+                    )}
                     <AvatarFallback className="text-xs">
                       {initials(user.full_name)}
                     </AvatarFallback>

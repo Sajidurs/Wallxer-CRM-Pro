@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { signAvatar } from "@/features/users/avatars";
 import { PageTransition } from "@/components/layout/page-transition";
 import { Topbar } from "@/components/layout/topbar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -64,7 +65,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           fullName={profile.full_name}
           email={profile.email}
           role={profile.role}
-          avatarUrl={profile.avatar_url}
+          avatarUrl={await signAvatar(profile.avatar_url)}
         />
         {/* A single readable column rather than full width. Notion's content
             area is generous but bounded; text running the width of a 27in

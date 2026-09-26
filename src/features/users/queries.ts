@@ -66,6 +66,8 @@ export async function getUserById(id: string): Promise<UserRow | null> {
 export interface UserOption {
   id: string;
   name: string;
+  /** Storage path, not a URL — sign it with `signAvatars` before rendering. */
+  avatarPath: string | null;
 }
 
 /**
@@ -80,11 +82,15 @@ export const listAssignableUsers = cache(async (): Promise<UserOption[]>  =>{
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name")
+    .select("id, full_name, avatar_url")
     .eq("status", "active")
     .order("full_name", { ascending: true });
 
-  return (data ?? []).map((row) => ({ id: row.id, name: row.full_name }));
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.full_name,
+    avatarPath: row.avatar_url,
+  }));
 })
 
 /**

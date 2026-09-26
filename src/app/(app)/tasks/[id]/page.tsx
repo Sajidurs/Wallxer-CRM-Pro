@@ -11,6 +11,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Person } from "@/components/common/person";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/features/tasks/schema";
+import { signAvatars } from "@/features/users/avatars";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
 import { atLeast, can } from "@/lib/permissions";
@@ -63,7 +65,16 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[id]">) {
     listChecklistItems(task.id),
   ]);
 
-  const peopleById = new Map(people.map((p) => [p.id, p.name]));
+  const avatars = await signAvatars(people.map((p) => p.avatarPath));
+  const peopleById = new Map(
+    people.map((p) => [
+      p.id,
+      {
+        name: p.name,
+        avatarUrl: p.avatarPath ? (avatars.get(p.avatarPath) ?? null) : null,
+      },
+    ]),
+  );
   const assignee = task.assigneeIds[0] ? peopleById.get(task.assigneeIds[0]) : null;
 
   const due = task.due_at ? new Date(task.due_at) : null;
@@ -189,7 +200,11 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[id]">) {
               <UserRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <div>
                 <div className="text-xs text-muted-foreground">Assignee</div>
-                {assignee ?? <span className="text-muted-foreground">Unassigned</span>}
+                {assignee ? (
+                  <Person person={assignee} size="md" />
+                ) : (
+                  <span className="text-muted-foreground">Unassigned</span>
+                )}
               </div>
             </div>
 

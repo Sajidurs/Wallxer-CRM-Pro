@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InviteUserDialog } from "@/features/users/components/invite-user-dialog";
+import { signAvatars } from "@/features/users/avatars";
 import { UsersTable } from "@/features/users/components/users-table";
 import { countActiveSuperAdmins, listUsers } from "@/features/users/queries";
 import { requireRole } from "@/lib/auth";
@@ -60,6 +61,7 @@ export default async function UsersPage() {
 
       <UsersTable
         users={users}
+        avatars={await signAvatars(users.map((u) => u.avatar_url))}
         actorId={actor.id}
         actorRole={actor.role}
         activeSuperAdmins={activeSuperAdmins}

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { PersonAvatar, type PersonInfo } from "@/components/common/person";
 import { Pill, type PillTone } from "@/components/common/pill";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +25,7 @@ import { TaskActions } from "./task-actions";
 
 interface TaskBoardProps {
   tasks: TaskListItem[];
-  people: Record<string, string>;
+  people: Record<string, PersonInfo>;
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -64,14 +65,6 @@ const COLUMN: Record<TaskStatus, { dot: string; surface: string }> = {
     surface: "bg-[#F5F9F4] dark:bg-[#6FA368]/8",
   },
 };
-
-/** Two letters, for the assignee chips in the card's corner. */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 /**
  * Drag and drop with the HTML5 drag API rather than a library.
@@ -284,13 +277,11 @@ export function TaskBoard({
                       {assignees.length > 0 && (
                         <span className="flex -space-x-1.5">
                           {assignees.map((id) => (
-                            <span
+                            <PersonAvatar
                               key={id}
-                              title={people[id] ?? "Someone"}
-                              className="flex size-6 items-center justify-center rounded-full bg-sidebar text-[10px] font-semibold text-muted-foreground ring-2 ring-card"
-                            >
-                              {initials(people[id] ?? "?")}
-                            </span>
+                              person={people[id] ?? { name: "Someone", avatarUrl: null }}
+                              className="ring-2 ring-card"
+                            />
                           ))}
                           {extra > 0 && (
                             <span className="flex size-6 items-center justify-center rounded-full bg-sidebar text-[10px] font-semibold text-muted-foreground ring-2 ring-card">

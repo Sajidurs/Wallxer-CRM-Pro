@@ -11,6 +11,8 @@ import {
 import { SetPasswordForm } from "@/features/auth/components/set-password-form";
 import { ProfileForm } from "@/features/users/components/profile-form";
 import { ROLE_LABELS } from "@/features/users/schema";
+import { signAvatar } from "@/features/users/avatars";
+import { AvatarUpload } from "@/features/users/components/avatar-upload";
 import { requireUser } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Your profile" };
@@ -43,7 +45,15 @@ export default async function ProfilePage() {
               Your name is what colleagues see on tasks, projects, and comments.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
+            {/* Above the form rather than inside it: the photo saves on
+                selection, so putting it under the same Save button would
+                misrepresent what that button does. */}
+            <AvatarUpload
+              currentUrl={await signAvatar(profile.avatar_url)}
+              fullName={profile.full_name}
+            />
+
             <ProfileForm
               defaults={{
                 fullName: profile.full_name,
