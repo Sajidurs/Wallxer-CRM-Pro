@@ -30,6 +30,17 @@ import {
   updateContactSchema,
 } from "../src/features/contacts/schema";
 import {
+  brandSchema,
+  updateBrandSchema,
+} from "../src/features/brands/schema";
+import {
+  invoiceFiltersSchema,
+  invoiceItemSchema,
+  invoiceSchema,
+  setInvoiceStatusSchema,
+  updateInvoiceSchema,
+} from "../src/features/invoices/schema";
+import {
   deleteTransactionSchema,
   transactionFiltersSchema,
   transactionSchema,
@@ -283,6 +294,99 @@ const cases: Case[] = [
     name: "transactionFiltersSchema",
     schema: transactionFiltersSchema,
     input: { q: "domain", kind: "expense" },
+  },
+  {
+    name: "brandSchema",
+    schema: brandSchema,
+    input: {
+      name: "  Wallxer  ",
+      color: "#2563EB",
+      legalName: "",
+      email: " billing@wallxer.com ",
+      phone: "",
+      // The transform prepends a scheme; on the second pass it must not
+      // prepend a second one.
+      website: "wallxer.com",
+      address: "  Dhaka  ",
+      bankDetails: "",
+      taxId: "",
+      invoicePrefix: " wlx ",
+      isActive: true,
+    },
+  },
+  {
+    name: "updateBrandSchema",
+    schema: updateBrandSchema,
+    input: {
+      id: UUID,
+      name: "Boost",
+      color: "#16a34a",
+      website: "https://boost.example",
+      invoicePrefix: "BST",
+      isActive: false,
+    },
+  },
+  {
+    // Quantity and rate both arrive as typed strings and leave as numbers,
+    // which is the shape that broke contact creation once already.
+    name: "invoiceItemSchema",
+    schema: invoiceItemSchema,
+    input: { description: "  Website design  ", quantity: "2.5", unitAmount: "1,250.75" },
+  },
+  {
+    name: "invoiceSchema (full)",
+    schema: invoiceSchema,
+    input: {
+      brandId: UUID,
+      contactId: UUID,
+      projectId: null,
+      currency: "USD",
+      issueDate: "2026-09-27",
+      dueDate: "2026-10-11",
+      taxRate: "7.5",
+      taxLabel: " VAT ",
+      notes: "  Thanks  ",
+      terms: "",
+      items: [
+        { description: "Design", quantity: "1", unitAmount: "500" },
+        { description: "Hosting", quantity: "12", unitAmount: "৳1,000.00" },
+      ],
+    },
+  },
+  {
+    name: "invoiceSchema (minimal)",
+    schema: invoiceSchema,
+    input: {
+      brandId: UUID,
+      currency: "BDT",
+      issueDate: "2026-09-27",
+      taxRate: "0",
+      items: [{ description: "One line", quantity: "1", unitAmount: "0" }],
+    },
+  },
+  {
+    name: "updateInvoiceSchema",
+    schema: updateInvoiceSchema,
+    input: {
+      id: UUID,
+      values: {
+        brandId: UUID,
+        currency: "EUR",
+        issueDate: "2026-09-27",
+        taxRate: "0",
+        items: [{ description: "Retainer", quantity: "1", unitAmount: "2000" }],
+      },
+    },
+  },
+  {
+    name: "setInvoiceStatusSchema",
+    schema: setInvoiceStatusSchema,
+    input: { id: UUID, status: "sent" },
+  },
+  {
+    name: "invoiceFiltersSchema",
+    schema: invoiceFiltersSchema,
+    input: { q: "WLX", status: "paid" },
   },
   {
     name: "taskFiltersSchema",

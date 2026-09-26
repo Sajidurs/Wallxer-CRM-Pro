@@ -100,6 +100,7 @@ Update this file at the end of every work session, before you stop.
 | `0020_restore_profile_guard.sql` | Yes, 2026-09-26         |
 | `0021_member_permissions.sql` | Yes, 2026-09-26            |
 | `0022_avatar_cleanup.sql` | Yes, 2026-09-26                |
+| `0023_invoices.sql`    | Yes, 2026-09-27                   |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -160,6 +161,71 @@ can be commented on, and one search box finds anything.
 ---
 
 ## Unreleased
+
+### 2026-09-27 — Invoices, and brands becoming companies
+
+**Added**
+
+- **`/invoices`** — create, edit, send, mark paid, and a print view that saves to PDF through the
+  browser. Line items with quantity and rate, an optional tax rate, and a per-invoice currency.
+- **Settings → Companies**, replacing the Phase 2 placeholder. Logo, legal name, email, phone,
+  website, address, bank details, tax id and invoice prefix — everything the letterhead needs.
+- **`/api/brand-logo`**, shaped like `/api/avatar`.
+
+**Changed**
+
+- **A brand is now a company.** It began as a tag — a name and a colour on a contact — and an
+  invoice needs the letterhead behind that tag. Growing the existing record was better than adding
+  a parallel "companies" table that would sit alongside brands and drift from it.
+- **Removed the Elever Notes company**, as asked. It was referenced by nothing — no contact,
+  project, deal or transaction — so it was deleted rather than deactivated.
+
+**Notes:**
+
+- **The letterhead freezes when an invoice leaves draft.** A draft shows the company as it is now; a
+  sent invoice shows what was copied onto it at the time. Changing your address must not silently
+  rewrite a document somebody else is holding. Putting an invoice back to draft drops the snapshot,
+  because it is being reworked. Verified by renaming the company after sending and asserting the
+  sent invoice did not follow.
+- **A sent invoice cannot be edited** — the form redirects and the action refuses. The same
+  reasoning: their copy and yours would disagree, silently.
+- **Numbers are allocated by one `UPDATE ... RETURNING`** on a per-company counter, so two people
+  creating at once cannot be handed the same number. Counting existing invoices would do exactly
+  that, and would also reuse the number of a deleted one. `WLX-0001` for Wallxer, `BOO-0001` for
+  Boost, each counting independently. The prefix defaults to the first three letters of the name.
+- **Totals belong to the database.** A line's amount is a generated column, the subtotal is summed
+  by a trigger on the items, and the invoice derives tax and total from the subtotal. Each field has
+  exactly one owner, so there is no order in which they can disagree — and a client cannot state a
+  total that contradicts the lines under it.
+- The subtotal trigger branches on `tg_op` before referencing `OLD`, because referencing `NEW` on a
+  delete raises. That is migration 0016's lesson, now applied by habit.
+- **Currency is per invoice; nothing is converted.** Finance stays taka-only. An exchange rate
+  nobody supplied would be a number the application invented.
+- **Invoices sit behind the Finance grant**, since an invoice is a revenue document and money was
+  deliberately restricted. Widening it later is one predicate in four policies. Changing company
+  details stays admin-only, because Settings is.
+- **Deleting a company that has issued invoices is refused** by the foreign key, and the action says
+  so in a sentence suggesting deactivation instead. The letterhead has to survive the document.
+- **9 new schema checks and 6 new RLS checks.** `invoiceSchema` turns typed strings into integers
+  and quantities, which is the exact shape that caused the "check the details below" bug; it round
+  trips. 36/36 idempotent, 109/116 RLS — the seven being the known self-demotion artifact.
+- A stale assertion in `verify:rls` hard-coded "all 5 brands" and began failing the moment one was
+  removed. It now counts rather than assumes.
+- Verified end to end against the production build: 32 of 32, covering numbering per company,
+  database-computed totals, the freeze, taka against dollars, the member's 404, and the refusal to
+  edit a sent invoice.
+
+**Not included:** emailing an invoice, since SMTP is still deferred; recurring invoices; and any
+automatic Finance entry when an invoice is paid, by decision — the ledger records money when it
+lands, not when it is promised.
+
+**Files touched:** `supabase/migrations/0023_invoices.sql`, `src/features/invoices/**`,
+`src/features/brands/**`, `src/app/(app)/invoices/**`, `src/app/(app)/settings/brands/page.tsx`,
+`src/app/api/brand-logo/route.ts`, `src/lib/money.ts`, `src/components/layout/nav-config.ts`,
+`scripts/{verify-rls.mjs,verify-schemas.ts}`
+
+**Migration:** 0023_invoices.sql — applied
+
 
 ### 2026-09-26 — Profile photos, and faces on the task pages
 

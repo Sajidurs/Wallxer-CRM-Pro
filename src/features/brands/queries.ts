@@ -33,3 +33,42 @@ export const listBrandOptions = cache(async (): Promise<BrandOption[]>  =>{
 
   return data ?? [];
 })
+
+/** Everything a company carries, for Settings and for an invoice letterhead. */
+export const listBrands = cache(async (): Promise<Brand[]> => {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("brands")
+    .select("*")
+    .order("position", { ascending: true });
+
+  return data ?? [];
+});
+
+export async function getBrand(id: string): Promise<Brand | null> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("brands")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  return data ?? null;
+}
+
+/** Companies that can issue an invoice, in the order they are shown. */
+export const listIssuerOptions = cache(
+  async (): Promise<{ id: string; name: string }[]> => {
+    const supabase = await createClient();
+
+    const { data } = await supabase
+      .from("brands")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("position", { ascending: true });
+
+    return data ?? [];
+  },
+);

@@ -90,3 +90,55 @@ export function parseTakaToPoisha(input: string): number | null {
 export function poishaToInput(poisha: number): string {
   return (poisha / 100).toFixed(2);
 }
+
+// ---------------------------------------------------------------------------
+// Invoice currencies
+// ---------------------------------------------------------------------------
+// An invoice is denominated in whatever the client agreed to, which is not
+// always taka. The ledger stays taka-only: nothing here converts, because a
+// conversion nobody supplied a rate for would be a number the app invented.
+
+export const CURRENCIES = ["BDT", "USD", "EUR", "GBP"] as const;
+export type Currency = (typeof CURRENCIES)[number];
+
+export const CURRENCY_LABELS: Record<Currency, string> = {
+  BDT: "BDT — Taka",
+  USD: "USD — US dollar",
+  EUR: "EUR — Euro",
+  GBP: "GBP — Pound sterling",
+};
+
+/** All four have two decimal places, so one divisor serves every one of them. */
+const MINOR_PER_UNIT = 100;
+
+const FORMATTERS: Record<Currency, Intl.NumberFormat> = {
+  // Taka is grouped the South Asian way and gets its symbol applied by hand,
+  // for the reasons in `formatPoisha` above.
+  BDT: new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }),
+  USD: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }),
+  EUR: new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR" }),
+  GBP: new Intl.NumberFormat("en-US", { style: "currency", currency: "GBP" }),
+};
+
+export function formatMinor(minor: number, currency: Currency): string {
+  const sign = minor < 0 ? "-" : "";
+  const magnitude = Math.abs(minor) / MINOR_PER_UNIT;
+
+  if (currency === "BDT") {
+    return `${sign}${CURRENCY_SYMBOL}${FORMATTERS.BDT.format(magnitude)}`;
+  }
+  return `${sign}${FORMATTERS[currency].format(magnitude)}`;
+}
+
+/** Whatever was typed, as minor units. Shares `parseTakaToPoisha`'s rules. */
+export function parseAmountToMinor(input: string): number | null {
+  return parseTakaToPoisha(input);
+}
+
+/** The editable form of a stored amount: `1234.56`. */
+export function minorToInput(minor: number): string {
+  return (minor / MINOR_PER_UNIT).toFixed(2);
+}

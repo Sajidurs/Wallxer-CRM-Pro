@@ -149,33 +149,63 @@ export type Database = {
       }
       brands: {
         Row: {
+          address: string | null
+          bank_details: string | null
           color: string
           created_at: string
+          email: string | null
           id: string
+          invoice_counter: number
+          invoice_prefix: string | null
           is_active: boolean
+          legal_name: string | null
+          logo_path: string | null
           name: string
+          phone: string | null
           position: number
+          tax_id: string | null
           updated_at: string
+          website: string | null
           workspace_id: string
         }
         Insert: {
+          address?: string | null
+          bank_details?: string | null
           color?: string
           created_at?: string
+          email?: string | null
           id?: string
+          invoice_counter?: number
+          invoice_prefix?: string | null
           is_active?: boolean
+          legal_name?: string | null
+          logo_path?: string | null
           name: string
+          phone?: string | null
           position?: number
+          tax_id?: string | null
           updated_at?: string
+          website?: string | null
           workspace_id: string
         }
         Update: {
+          address?: string | null
+          bank_details?: string | null
           color?: string
           created_at?: string
+          email?: string | null
           id?: string
+          invoice_counter?: number
+          invoice_prefix?: string | null
           is_active?: boolean
+          legal_name?: string | null
+          logo_path?: string | null
           name?: string
+          phone?: string | null
           position?: number
+          tax_id?: string | null
           updated_at?: string
+          website?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -646,6 +676,187 @@ export type Database = {
           },
           {
             foreignKeyName: "deals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_items: {
+        Row: {
+          amount_minor: number | null
+          created_at: string
+          description: string
+          id: string
+          invoice_id: string
+          position: number
+          quantity: number
+          unit_amount_minor: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_minor?: number | null
+          created_at?: string
+          description: string
+          id?: string
+          invoice_id: string
+          position?: number
+          quantity?: number
+          unit_amount_minor?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount_minor?: number | null
+          created_at?: string
+          description?: string
+          id?: string
+          invoice_id?: string
+          position?: number
+          quantity?: number
+          unit_amount_minor?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          brand_id: string
+          client_snapshot: Json | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: Database["public"]["Enums"]["invoice_currency"]
+          deleted_at: string | null
+          due_date: string | null
+          id: string
+          issue_date: string
+          issuer_snapshot: Json | null
+          notes: string | null
+          number: string
+          paid_at: string | null
+          project_id: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal_minor: number
+          tax_label: string | null
+          tax_minor: number
+          tax_rate: number
+          terms: string | null
+          total_minor: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          brand_id: string
+          client_snapshot?: Json | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["invoice_currency"]
+          deleted_at?: string | null
+          due_date?: string | null
+          id?: string
+          issue_date?: string
+          issuer_snapshot?: Json | null
+          notes?: string | null
+          number: string
+          paid_at?: string | null
+          project_id?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal_minor?: number
+          tax_label?: string | null
+          tax_minor?: number
+          tax_rate?: number
+          terms?: string | null
+          total_minor?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          brand_id?: string
+          client_snapshot?: Json | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["invoice_currency"]
+          deleted_at?: string | null
+          due_date?: string | null
+          id?: string
+          issue_date?: string
+          issuer_snapshot?: Json | null
+          notes?: string | null
+          number?: string
+          paid_at?: string | null
+          project_id?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal_minor?: number
+          tax_label?: string | null
+          tax_minor?: number
+          tax_rate?: number
+          terms?: string | null
+          total_minor?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_projects_at_risk"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1688,6 +1899,7 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      next_invoice_number: { Args: { p_brand_id: string }; Returns: string }
       reveal_credential: {
         Args: { p_credential_id: string }
         Returns: {
@@ -1724,6 +1936,8 @@ export type Database = {
         | "social"
         | "other"
       deal_status: "open" | "won" | "lost"
+      invoice_currency: "BDT" | "USD" | "EUR" | "GBP"
+      invoice_status: "draft" | "sent" | "paid" | "cancelled"
       link_kind: "video" | "document" | "design" | "repository" | "reference"
       payment_method:
         | "cash"
@@ -1886,6 +2100,8 @@ export const Constants = {
         "other",
       ],
       deal_status: ["open", "won", "lost"],
+      invoice_currency: ["BDT", "USD", "EUR", "GBP"],
+      invoice_status: ["draft", "sent", "paid", "cancelled"],
       link_kind: ["video", "document", "design", "repository", "reference"],
       payment_method: [
         "cash",

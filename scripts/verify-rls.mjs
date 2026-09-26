@@ -67,11 +67,26 @@ if (signInError) {
   process.exit(1);
 }
 
+// Counted rather than hard-coded. The point is that a signed-in user sees
+// every brand in the workspace, not that there happen to be five — a number
+// that went stale the first time one was removed. The service-role client is
+// built later for the member checks, so this borrows the key directly.
+const brandTruth = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? await createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false },
+    })
+      .from("brands")
+      .select("id", { count: "exact", head: true })
+  : { count: null };
+
 const userBrands = await user.from("brands").select("name");
 check(
-  "signed-in user reads all 5 brands",
-  userBrands.data?.length === 5,
-  userBrands.error?.message ?? `rows: ${userBrands.data?.length}`,
+  "signed-in user reads every brand in the workspace",
+  brandTruth.count === null
+    ? (userBrands.data?.length ?? 0) > 0
+    : userBrands.data?.length === brandTruth.count,
+  userBrands.error?.message ??
+    `rows: ${userBrands.data?.length}${brandTruth.count === null ? "" : ` of ${brandTruth.count}`}`,
 );
 
 const userProfiles = await user.from("profiles").select("email,role");
@@ -1521,6 +1536,101 @@ if (!serviceKey) {
     );
 
     await admin.from("transactions").delete().like("description", "__finance_probe%");
+
+    // --- invoices (0023) ----------------------------------------------------
+    // Invoices sit behind the same grant as the ledger, because an invoice is a
+    // revenue document. The member here has had the grant revoked again by the
+    // checks above, so this is the ungranted case throughout.
+
+    const { data: anyBrand } = await admin
+      .from("brands")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .limit(1)
+      .single();
+
+    const { data: probeInvoice } = await admin
+      .from("invoices")
+      .insert({
+        workspace_id: workspaceId,
+        brand_id: anyBrand.id,
+        number: `RLSPROBE-${Date.now()}`,
+        currency: "BDT",
+        issue_date: "2026-09-27",
+      })
+      .select("id")
+      .single();
+
+    const anonInvoices = await anon.from("invoices").select("*");
+    check(
+      "anon reads no invoices",
+      (anonInvoices.data?.length ?? 0) === 0,
+      anonInvoices.error ? anonInvoices.error.message : `rows: ${anonInvoices.data?.length}`,
+    );
+
+    const memberInvoices = await member.from("invoices").select("id");
+    check(
+      "member without the finance grant reads no invoices",
+      (memberInvoices.data?.length ?? 0) === 0,
+      memberInvoices.error?.message ?? `rows: ${memberInvoices.data?.length}`,
+    );
+
+    const memberInvoiceWrite = await member.from("invoices").insert({
+      workspace_id: workspaceId,
+      brand_id: anyBrand.id,
+      number: `RLSDENIED-${Date.now()}`,
+      currency: "BDT",
+      issue_date: "2026-09-27",
+    });
+    check(
+      "member without the grant cannot raise an invoice",
+      !!memberInvoiceWrite.error,
+      memberInvoiceWrite.error?.message ?? "NO ERROR — ungranted member invoiced",
+    );
+
+    const memberNumber = await member.rpc("next_invoice_number", {
+      p_brand_id: anyBrand.id,
+    });
+    check(
+      "member without the grant cannot allocate an invoice number",
+      !!memberNumber.error,
+      memberNumber.error?.message ?? "NO ERROR — number handed out",
+    );
+
+    const hardDeleteInvoice = await user
+      .from("invoices")
+      .delete()
+      .eq("id", probeInvoice.id)
+      .select("id");
+    check(
+      "an invoice cannot be hard deleted",
+      (hardDeleteInvoice.data?.length ?? 0) === 0,
+      hardDeleteInvoice.error?.message ?? `rows deleted: ${hardDeleteInvoice.data?.length}`,
+    );
+
+    // Totals are the database's job, so a client cannot state a total that
+    // disagrees with the lines under it.
+    await admin.from("invoice_items").insert({
+      workspace_id: workspaceId,
+      invoice_id: probeInvoice.id,
+      description: "__rls_probe_line__",
+      quantity: 3,
+      unit_amount_minor: 1000,
+    });
+    const { data: computed } = await admin
+      .from("invoices")
+      .select("subtotal_minor")
+      .eq("id", probeInvoice.id)
+      .single();
+    check(
+      "invoice totals are computed by the database",
+      Number(computed.subtotal_minor) === 3000,
+      String(computed.subtotal_minor),
+    );
+
+    await admin.from("invoice_items").delete().eq("invoice_id", probeInvoice.id);
+    await admin.from("invoices").delete().eq("id", probeInvoice.id);
+    await admin.from("brands").update({ invoice_counter: 0 }).eq("id", anyBrand.id);
     await admin.auth.admin.deleteUser(grantAdmin.user.id);
 
     // Suspension must deny immediately, without deleting anything.
