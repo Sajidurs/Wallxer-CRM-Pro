@@ -197,3 +197,30 @@ export async function getByProject(
     };
   });
 }
+
+/**
+ * A slice of the ledger, newest first.
+ *
+ * Offset-based rather than page-based, because the finance page appends rather
+ * than replaces: "show me twenty more" is an offset question, and translating
+ * it into a page number would only invite an off-by-one at the boundary.
+ */
+export async function listTransactionSlice(
+  offset: number,
+  limit: number,
+): Promise<{ transactions: TransactionListItem[]; total: number }> {
+  const supabase = await createClient();
+
+  const { data, count } = await supabase
+    .from("transactions")
+    .select(LIST_COLUMNS, { count: "exact" })
+    .is("deleted_at", null)
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  return {
+    transactions: (data ?? []) as TransactionListItem[],
+    total: count ?? 0,
+  };
+}

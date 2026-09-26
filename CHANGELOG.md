@@ -159,6 +159,46 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-26 — The ledger moved onto the finance page
+
+**Changed**
+
+Transactions now sit under the reports on `/finance` instead of behind a link, with a **Load more**
+button rather than pagination.
+
+- Ten rows to begin with, twenty more per click, and a `Showing 10 of 14` counter beside the button.
+  The button retires itself when there is nothing left.
+- **Rows are appended, not paged.** Reaching the twentieth transaction should not mean losing the
+  charts above and navigating back to them.
+- The button asks a server action for the next slice only. Re-rendering the page would recompute
+  every aggregate above it to add twenty rows — about half a second of Seoul round trips for
+  something that is not changing.
+- `/finance/transactions` stays as a redirect rather than being deleted, so a bookmark still lands
+  somewhere useful.
+
+**Notes:**
+
+- **The ledger is deliberately not scoped to the report window above it.** The reports answer "how
+  did this period go"; the ledger answers "what is in here". Silently hiding older rows behind a
+  date filter nobody set would make the second question unanswerable.
+- `listTransactionSlice` is offset-based rather than page-based, because appending is an offset
+  question and translating it into a page number only invites an off-by-one at the boundary.
+- Appending de-duplicates by id before merging. If a row is removed between two fetches the window
+  shifts by one and the next slice would otherwise repeat a row already on screen.
+- Verified by driving headless Edge over the DevTools Protocol, because "does the button work" is
+  not a question a server render can answer: ten rows before the click, fourteen after, fourteen
+  distinct, the button gone and the counter reading `Showing 14 of 14`, with the charts still above.
+  The first run reported eleven and fifteen — the page has two tables, and the count was picking up
+  the chart's own "figures as a table" view as well. That was the assertion being wrong, not the
+  ledger.
+
+**Files touched:** `src/app/(app)/finance/{page,transactions/page}.tsx`,
+`src/features/finance/components/ledger-panel.tsx`,
+`src/features/finance/{queries,actions,schema}.ts`
+
+**Migration:** none
+
+
 ### 2026-09-26 — September ledger imported from the spreadsheet
 
 **Data, not code.** Twelve rows from the supplied sheet, recorded against the Finance module. Noted

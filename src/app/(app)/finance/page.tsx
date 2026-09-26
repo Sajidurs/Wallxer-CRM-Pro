@@ -7,9 +7,23 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BreakdownBars, ProfitBars } from "@/features/finance/components/breakdown-bars";
+import { LedgerPanel } from "@/features/finance/components/ledger-panel";
 import { TrendChart } from "@/features/finance/components/trend-chart";
-import { getByCategory, getByProject, getSeries } from "@/features/finance/queries";
-import { BUCKETS, BUCKET_LABELS, reportFiltersSchema, type Bucket } from "@/features/finance/schema";
+import {
+  getByCategory,
+  getByProject,
+  getSeries,
+  listCategories,
+  listTransactionSlice,
+} from "@/features/finance/queries";
+import {
+  BUCKETS,
+  BUCKET_LABELS,
+  LEDGER_INITIAL,
+  reportFiltersSchema,
+  type Bucket,
+} from "@/features/finance/schema";
+import { listProjectOptions } from "@/features/projects/queries";
 import { requireFinanceAccess } from "@/lib/auth";
 import { formatPoisha } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -40,11 +54,19 @@ export default async function FinancePage(props: PageProps<"/finance">) {
   const from = format(start, "yyyy-MM-dd");
   const to = format(now, "yyyy-MM-dd");
 
-  const [series, byCategory, byProject] = await Promise.all([
-    getSeries(from, to, filters.bucket),
-    getByCategory(from, to),
-    getByProject(from, to),
-  ]);
+  // The ledger is deliberately not scoped to the report window above it: the
+  // reports answer "how did this period go", the ledger answers "what is in
+  // here", and silently hiding older rows behind a date filter nobody set would
+  // make the second question unanswerable.
+  const [series, byCategory, byProject, ledger, categories, projectOptions] =
+    await Promise.all([
+      getSeries(from, to, filters.bucket),
+      getByCategory(from, to),
+      getByProject(from, to),
+      listTransactionSlice(0, LEDGER_INITIAL),
+      listCategories(),
+      listProjectOptions(),
+    ]);
 
   const income = series.reduce((sum, p) => sum + p.income, 0);
   const expense = series.reduce((sum, p) => sum + p.expense, 0);
@@ -201,14 +223,34 @@ export default async function FinancePage(props: PageProps<"/finance">) {
         </CardContent>
       </Card>
 
-      <div className="flex justify-center">
-        <Button asChild variant="outline">
-          <Link href="/finance/transactions">
-            <Wallet />
-            See every transaction
-          </Link>
-        </Button>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Transactions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {ledger.transactions.length === 0 ? (
+            <div className="py-8 text-center">
+              <Wallet className="mx-auto size-6 text-muted-foreground/60" />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Nothing recorded yet.
+              </p>
+              <Button asChild variant="outline" size="sm" className="mt-3">
+                <Link href="/finance/new">
+                  <Plus />
+                  Record the first one
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <LedgerPanel
+              initial={ledger.transactions}
+              total={ledger.total}
+              categories={categories}
+              projects={projectOptions}
+            />
+          )}
+        </CardContent>
+      </Card>
     </>
   );
 }

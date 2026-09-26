@@ -139,3 +139,12 @@ export const financeAccessSchema = z.object({
   id: z.uuid(),
   granted: z.boolean(),
 });
+
+/** How many ledger rows the finance page shows before you ask for more. */
+export const LEDGER_INITIAL = 10;
+export const LEDGER_STEP = 20;
+
+export const loadMoreSchema = z.object({
+  offset: z.coerce.number().int().min(0).max(100000),
+  limit: z.coerce.number().int().min(1).max(100),
+});

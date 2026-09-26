@@ -12,10 +12,13 @@ import {
   categorySchema,
   deleteTransactionSchema,
   financeAccessSchema,
+  loadMoreSchema,
   transactionSchema,
   updateTransactionSchema,
   type TransactionValues,
 } from "./schema";
+
+import { listTransactionSlice, type TransactionListItem } from "./queries";
 
 function toRow(values: TransactionValues) {
   return {
@@ -195,4 +198,23 @@ export async function setFinanceAccess(
 
   revalidatePath("/settings/users");
   return ok({ id: parsed.data.id, granted: parsed.data.granted });
+}
+
+/**
+ * The "Load more" button's other half.
+ *
+ * Returns rows rather than re-rendering the page, so appending twenty
+ * transactions does not also recompute every report aggregate above them.
+ */
+export async function loadMoreTransactions(
+  input: unknown,
+): Promise<ActionResult<{ transactions: TransactionListItem[]; total: number }>> {
+  const gate = await requireFinance();
+  if (!gate.ok) return fail(gate.error);
+
+  const parsed = loadMoreSchema.safeParse(input);
+  if (!parsed.success) return fail("That request is not valid.");
+
+  const slice = await listTransactionSlice(parsed.data.offset, parsed.data.limit);
+  return ok(slice);
 }
