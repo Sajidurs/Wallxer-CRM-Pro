@@ -44,19 +44,23 @@ const RULES: Record<Resource, Partial<Record<Action, Role>>> = {
   contact: { view: "member", create: "member", update: "member", delete: "manager" },
   deal: { view: "member", create: "member", update: "member", delete: "manager" },
   project: { view: "member", create: "member", update: "member", delete: "manager" },
-  // `update` on a task is intentionally permissive here; whether a member may
-  // edit *this* task depends on assignment, which `canEditTask` answers.
-  task: { view: "member", create: "member", update: "member", delete: "manager" },
+  // Members run the work: any task, not only the ones assigned to them, and
+  // deleting one too. Migration 0021 removed the matching restriction from
+  // `guard_task_edit`, which is the half that actually enforces it.
+  task: { view: "member", create: "member", update: "member", delete: "member" },
   // Every active role may reveal a credential, by decision. Accountability
-  // comes from credential_access_log, not from withholding access.
-  // `delete` is manager, not admin, to match what the database actually
-  // enforces in delete_credential. A manager can already delete the whole
-  // project a credential hangs off, so withholding the smaller action only
-  // created a UI that disagreed with the boundary.
-  credential: { view: "member", create: "manager", update: "manager", delete: "manager", reveal: "member" },
-  user: { view: "member", create: "admin", update: "admin", delete: "super_admin" },
-  brand: { view: "member", create: "admin", update: "admin", delete: "admin" },
-  pipeline: { view: "member", create: "admin", update: "admin", delete: "admin" },
+  // comes from credential_access_log, not from withholding access — and since
+  // a member could already read the secret, withholding *writing* one only
+  // meant they had to ask someone else to type it in. 0021 opened the three
+  // functions to match.
+  credential: { view: "member", create: "member", update: "member", delete: "member", reveal: "member" },
+  // `view` is admin on all three so the Settings section does not appear in the
+  // sidebar for anyone else. Every one of those routes already called
+  // `requireRole("admin")`, so a member clicking through was only ever bounced
+  // back — the nav was advertising doors that do not open.
+  user: { view: "admin", create: "admin", update: "admin", delete: "super_admin" },
+  brand: { view: "admin", create: "admin", update: "admin", delete: "admin" },
+  pipeline: { view: "admin", create: "admin", update: "admin", delete: "admin" },
   workspace: { view: "member", update: "admin" },
 };
 
@@ -81,19 +85,12 @@ export function can(
   return atLeast(user.role, minimum);
 }
 
-/**
- * A member may edit only tasks assigned to them. Manager and above edit any.
- * Kept separate from `can` because it needs the record, not just the role.
- */
-export function canEditTask(
-  user: PermissionSubject | null | undefined,
-  task: { assigneeIds: string[] },
-): boolean {
-  if (!can(user, "update", "task")) return false;
-  if (!user) return false;
-  if (atLeast(user.role, "manager")) return true;
-  return task.assigneeIds.includes(user.id);
-}
+// `canEditTask` used to live here, restricting a member to tasks assigned to
+// them. It went in 0021 along with the matching check in `guard_task_edit`: a
+// member who could not tick a subtask on a colleague's task simply asked
+// someone else to do it, which is an obstacle rather than a boundary. Callers
+// now ask `can(user, "update", "task")`, and three of them stopped querying
+// task_assignees to answer a question that no longer depends on it.
 
 /** Admin and super admin reach Settings. Nobody else sees the nav entry. */
 export function canManageSettings(

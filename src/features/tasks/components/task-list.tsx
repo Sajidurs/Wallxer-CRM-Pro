@@ -27,8 +27,8 @@ interface TaskListProps {
   projects: Record<string, string>;
   linkCounts: Record<string, number>;
   /** Editing depends on assignment, so it is decided per row. */
-  currentUserId: string;
-  isManager: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
 const PRIORITY_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
@@ -64,8 +64,8 @@ export function TaskList({
   people,
   projects,
   linkCounts,
-  currentUserId,
-  isManager,
+  canEdit,
+  canDelete,
 }: TaskListProps) {
   return (
     <div className="rounded-lg border">
@@ -165,8 +165,8 @@ export function TaskList({
                   <TaskActions
                     taskId={task.id}
                     title={task.title}
-                    canEdit={isManager || task.assigneeIds.includes(currentUserId)}
-                    canDelete={isManager}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
                   />
                 </TableCell>
               </TableRow>

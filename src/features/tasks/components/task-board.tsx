@@ -25,8 +25,8 @@ import { TaskActions } from "./task-actions";
 interface TaskBoardProps {
   tasks: TaskListItem[];
   people: Record<string, string>;
-  currentUserId: string;
-  isManager: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
 const PRIORITY_TONE: Record<TaskPriority, PillTone> = {
@@ -83,8 +83,8 @@ function initials(name: string): string {
 export function TaskBoard({
   tasks,
   people,
-  currentUserId,
-  isManager,
+  canEdit,
+  canDelete,
 }: TaskBoardProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -101,9 +101,9 @@ export function TaskBoard({
     setLocal(tasks);
   }
 
-  function canMove(task: TaskListItem) {
-    return isManager || task.assigneeIds.includes(currentUserId);
-  }
+  // Everyone who may edit a task may move it. 0021 removed the assignment
+  // restriction, so there is no longer a per-card answer to give.
+  const canMove = canEdit;
 
   function drop(status: TaskStatus) {
     setOverColumn(null);
@@ -114,8 +114,8 @@ export function TaskBoard({
     const task = local.find((t) => t.id === id);
     if (!task || task.status === status) return;
 
-    if (!canMove(task)) {
-      toast.error("You can only move tasks assigned to you.");
+    if (!canMove) {
+      toast.error("You do not have permission to move tasks.");
       return;
     }
 
@@ -189,7 +189,7 @@ export function TaskBoard({
 
             <div className="mt-1 flex flex-col gap-2">
               {column.map((task) => {
-                const movable = canMove(task);
+                const movable = canMove;
                 const due = task.due_at ? new Date(task.due_at) : null;
                 const overdue = due && isPast(due) && task.status !== "done";
                 const assignees = task.assigneeIds.slice(0, 3);
@@ -217,8 +217,8 @@ export function TaskBoard({
                         <TaskActions
                           taskId={task.id}
                           title={task.title}
-                          canEdit={movable}
-                          canDelete={isManager}
+                          canEdit={canEdit}
+                          canDelete={canDelete}
                         />
                       </div>
                     </div>

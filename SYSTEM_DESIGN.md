@@ -143,7 +143,17 @@ Four roles, stored as an enum on `profiles`.
 | `super_admin` | Everything, including creating and deleting users and changing roles.                      |
 | `admin`       | Everything except deleting the last super admin and changing billing settings.             |
 | `manager`     | Full CRUD on contacts, pipeline, projects, tasks. Cannot manage users.                     |
-| `member`      | Read everything, create and edit records, edit only tasks assigned to them, cannot delete. |
+| `member`      | Read everything; create and edit every record including credentials; full control of tasks and their checklists, assigned or not, including deleting them; add, edit and remove credentials and websites. Cannot delete a contact, project or deal, and does not see Settings. |
+
+Revised by migration 0021. `member` was originally "edit only tasks assigned to them, cannot
+delete": in practice a member who could not tick a subtask on a colleague's task simply asked
+someone else to, which is an obstacle rather than a boundary. Credentials moved for the same reason
+— a member could already *reveal* a secret, so withholding the ability to *write* one protected
+nothing. What did not move is deletion of the records the business is made of.
+
+`view` on users, brands and pipelines is `admin`, which is what keeps the Settings section out of
+the sidebar. Those routes already called `requireRole("admin")`, so the nav had been advertising
+doors that do not open.
 
 **Reveal permission on credentials is separate from role.** Per your decision, every active
 role can reveal a credential, and every reveal writes a row to `credential_access_log`.

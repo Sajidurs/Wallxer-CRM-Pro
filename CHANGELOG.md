@@ -98,6 +98,7 @@ Update this file at the end of every work session, before you stop.
 | `0018_task_checklist.sql` | Yes, 2026-09-25                |
 | `0019_finance.sql`     | Yes, 2026-09-26                   |
 | `0020_restore_profile_guard.sql` | Yes, 2026-09-26         |
+| `0021_member_permissions.sql` | Yes, 2026-09-26            |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -158,6 +159,66 @@ can be commented on, and one search box finds anything.
 ---
 
 ## Unreleased
+
+### 2026-09-26 — Members run the work; Settings belongs to admins
+
+**Changed**
+
+By decision, the `member` role was too narrow to be useful and the sidebar was showing Settings to
+people who could not open it.
+
+- **A member may now edit and delete any task**, not only tasks assigned to them, and therefore
+  manage any task's checklist. The assignment restriction is gone from `guard_task_edit`, from
+  `can_edit_task`, and from the UI.
+- **A member may add, edit and remove credentials.** They could already *reveal* a secret — settled
+  in 0006, with `credential_access_log` as the accountability — so withholding the ability to write
+  one only meant asking a manager to type it in. Every call still writes a log row.
+- **Settings disappears for anyone below admin.** `view` on users, brands and pipelines is now
+  `admin`, which removes the whole section from the sidebar.
+- **What did not move:** deleting a contact, project or deal is still manager work. Assigning a task
+  is still manager-or-creator — it no longer grants edit rights, but it decides whose queue a task
+  appears in.
+
+**Fixed**
+
+- The Settings rows in the sidebar were links to routes that every non-admin was bounced out of.
+  All three already called `requireRole("admin")`, so this was never a hole — the nav was
+  advertising doors that do not open.
+
+**Notes:**
+
+- **The SELECT policy had to move with the permission.** Postgres requires an UPDATE's resulting row
+  to still satisfy SELECT, so while `tasks_select_own_workspace` ended in
+  `deleted_at is null or is_manager()`, a member's soft delete was rejected for producing a row that
+  member could no longer read. That is exactly the bug migration 0009 was written for, and it would
+  have made "members can delete tasks" fail in a way that looked like a permissions problem. The
+  same applies to credentials and the undo toast.
+- **Every replaced function was rebuilt from its newest definition.** `create_credential` and
+  `update_credential` were last written in 0007, not 0006; rebuilding from 0006 would have silently
+  restored the unqualified pgcrypto calls that broke every credential write. Migration 0020 exists
+  because that mistake was made once already, so this time each one was grepped for first.
+- **`canEditTask` is gone.** It now answered the same question as `can(user, "update", "task")`, and
+  three of its five callers were querying `task_assignees` on every request purely to feed it — a
+  round trip to Seoul to answer a question that no longer depends on the answer. Reassignment still
+  reads the current assignee, but only inside the manager branch that might use it.
+- **Seven checks in `verify:rls` asserted the old boundary and now assert the new one**, plus eight
+  new ones: a member editing a colleague's task, deleting a task and undoing it, adding a subtask to
+  anyone's task, the full credential create/edit/remove/undo path, and — the one that matters most —
+  that a member still cannot delete a project. 103 of 110 pass; the seven failures are the
+  long-standing self-demotion artifact in the suite, unchanged by this.
+- Verified against the production build as both a member and an admin: no Settings links and a
+  bounce from all three routes for the member, Settings intact for the admin, task menus and the
+  project credential and website sections reachable, and Finance still 404 for a member without the
+  grant. 21 of 21.
+- SYSTEM_DESIGN section 4's role table has been rewritten to match, rather than left contradicting
+  the system.
+
+**Files touched:** `supabase/migrations/0021_member_permissions.sql`, `src/lib/permissions.ts`,
+`src/features/tasks/{actions.ts,components/{task-board,task-list}.tsx}`,
+`src/app/(app)/tasks/**`, `scripts/verify-rls.mjs`, `SYSTEM_DESIGN.md`
+
+**Migration:** 0021_member_permissions.sql — applied
+
 
 ### 2026-09-26 — The ledger moved onto the finance page
 

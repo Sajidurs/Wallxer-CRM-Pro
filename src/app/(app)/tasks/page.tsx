@@ -17,7 +17,7 @@ import { listBoardTasks, listTasks } from "@/features/tasks/queries";
 import { taskFiltersSchema } from "@/features/tasks/schema";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
-import { atLeast } from "@/lib/permissions";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Tasks" };
 
@@ -96,8 +96,8 @@ export default async function TasksPage(props: PageProps<"/tasks">) {
         <TaskBoard
           tasks={tasks}
           people={peopleById}
-          currentUserId={actor.id}
-          isManager={atLeast(actor.role, "manager")}
+          canEdit={can(actor, "update", "task")}
+          canDelete={can(actor, "delete", "task")}
         />
       ) : tasks.length === 0 ? (
         <EmptyState
@@ -126,8 +126,8 @@ export default async function TasksPage(props: PageProps<"/tasks">) {
             people={peopleById}
             projects={projectsById}
             linkCounts={linkCounts}
-            currentUserId={actor.id}
-            isManager={atLeast(actor.role, "manager")}
+            canEdit={can(actor, "update", "task")}
+            canDelete={can(actor, "delete", "task")}
           />
           {listResult && (
             <Suspense fallback={null}>

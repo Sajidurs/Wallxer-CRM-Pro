@@ -458,11 +458,55 @@ if (!serviceKey) {
       p_notes: null,
       p_contact_id: null,
     });
+    // Opened to members in 0021. A member could already *reveal* a credential,
+    // so withholding the ability to write one only meant asking a manager to
+    // type it in. Every call still writes a credential_access_log row.
     check(
-      "member cannot create a credential",
-      !!memberCreateCred.error,
-      memberCreateCred.error?.message ?? "NO ERROR — members can add credentials",
+      "member can create a credential",
+      !memberCreateCred.error && !!memberCreateCred.data,
+      memberCreateCred.error?.message ?? String(memberCreateCred.data),
     );
+
+    if (memberCreateCred.data) {
+      const memberEditCred = await member.rpc("update_credential", {
+        p_id: memberCreateCred.data,
+        p_label: "Member edited",
+        p_category: "other",
+        p_url: null,
+        p_username: "u2",
+        p_secret: null,
+        p_notes: null,
+        p_clear_notes: false,
+      });
+      check(
+        "member can edit a credential",
+        !memberEditCred.error,
+        memberEditCred.error?.message ?? "ok",
+      );
+
+      const memberDelCred = await member.rpc("delete_credential", {
+        p_id: memberCreateCred.data,
+        p_deleted: true,
+      });
+      check(
+        "member can remove a credential",
+        !memberDelCred.error,
+        memberDelCred.error?.message ?? "ok",
+      );
+
+      // The undo has to be reachable too, which needs the row to stay visible.
+      const memberSeesDeleted = await member
+        .from("credentials")
+        .select("id")
+        .eq("id", memberCreateCred.data);
+      check(
+        "member can still see it to undo",
+        (memberSeesDeleted.data?.length ?? 0) === 1,
+        memberSeesDeleted.error?.message ?? `rows: ${memberSeesDeleted.data?.length}`,
+      );
+
+      await admin.from("credentials").delete().eq("id", memberCreateCred.data);
+    }
 
     const SECRET = `probe-secret-${Date.now()}`;
     const createdCred = await user.rpc("create_credential", {
@@ -745,10 +789,12 @@ if (!serviceKey) {
       .from("tasks")
       .update({ title: "hijacked" })
       .eq("id", unassignedTask.id);
+    // 0021 removed the assignment restriction: members run the work, so a
+    // member may edit any task in the workspace, not only their own.
     check(
-      "member cannot edit a task that is not theirs",
-      !!editNotMine.error,
-      editNotMine.error?.message ?? "NO ERROR — members can edit anything",
+      "member can edit a task that is not theirs",
+      !editNotMine.error,
+      editNotMine.error?.message ?? "ok",
     );
 
     const editMine = await member
@@ -761,8 +807,9 @@ if (!serviceKey) {
       editMine.error?.message ?? "ok",
     );
 
-    // The escalation this design has to refuse: assigning yourself someone
-    // else's task would otherwise be a one-step route to editing everything.
+    // Assignment is no longer the lever that grants edit rights — 0021 gave
+    // those to every member outright — but it still decides whose queue a task
+    // shows up in, so it stays manager-or-creator work.
     const selfAssign = await member.from("task_assignees").insert({
       task_id: unassignedTask.id,
       user_id: memberId,
@@ -778,10 +825,71 @@ if (!serviceKey) {
       .from("tasks")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", assignedTask.id);
+    // 0021. Note the shape of this one: the soft delete is an UPDATE whose
+    // resulting row must still satisfy the SELECT policy. While that policy
+    // ended in `deleted_at is null or is_manager()` a member's own delete was
+    // rejected for producing a row they could no longer read — the bug 0009
+    // was written for, which is why 0021 had to widen the policy too.
     check(
-      "member cannot delete even their own task",
-      !!memberDeleteTask.error,
-      memberDeleteTask.error?.message ?? "NO ERROR — members can delete tasks",
+      "member can delete a task",
+      !memberDeleteTask.error,
+      memberDeleteTask.error?.message ?? "ok",
+    );
+
+    const memberSeesDeletedTask = await member
+      .from("tasks")
+      .select("id, deleted_at")
+      .eq("id", assignedTask.id);
+    check(
+      "and can still see it to undo",
+      memberSeesDeletedTask.data?.[0]?.deleted_at != null,
+      memberSeesDeletedTask.error?.message ??
+        String(memberSeesDeletedTask.data?.[0]?.deleted_at),
+    );
+
+    const memberRestore = await member
+      .from("tasks")
+      .update({ deleted_at: null })
+      .eq("id", assignedTask.id);
+    check(
+      "member can undo their own delete",
+      !memberRestore.error,
+      memberRestore.error?.message ?? "ok",
+    );
+
+    // A checklist follows its task, so this must hold for a task the member is
+    // not assigned to — that is the whole point of the change.
+    const subtaskOnOthers = await member
+      .from("task_checklist_items")
+      .insert({
+        workspace_id: workspaceId,
+        task_id: unassignedTask.id,
+        title: "__probe_member_subtask__",
+      })
+      .select("id")
+      .single();
+    check(
+      "member can add a subtask to anyone's task",
+      !subtaskOnOthers.error,
+      subtaskOnOthers.error?.message ?? "ok",
+    );
+    if (subtaskOnOthers.data) {
+      await admin
+        .from("task_checklist_items")
+        .delete()
+        .eq("id", subtaskOnOthers.data.id);
+    }
+
+    // The boundary that did NOT move: deleting a whole project, contact or
+    // deal is still manager work.
+    const memberDeleteProject = await member
+      .from("projects")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", projectId);
+    check(
+      "member still cannot delete a project",
+      !!memberDeleteProject.error,
+      memberDeleteProject.error?.message ?? "NO ERROR — members can delete projects",
     );
 
     // Positive soft-delete path, the check whose absence hid the attachment bug.
@@ -833,9 +941,10 @@ if (!serviceKey) {
     );
 
     // --- task checklists (0018) --------------------------------------------
-    // A checklist inherits its task's edit rule through can_edit_task. The
-    // interesting case is the member who is NOT assigned: reading is allowed
-    // (the progress bar has to be explainable), writing is not.
+    // A checklist inherits its task's edit rule through can_edit_task, which
+    // 0021 widened to the whole workspace. The interesting case is now the
+    // reverse of what it was: a member managing a colleague's checklist is the
+    // intended behaviour, not the hole.
 
     const checklistOnMine = await member
       .from("task_checklist_items")
@@ -861,12 +970,13 @@ if (!serviceKey) {
       })
       .select("id");
     check(
-      "member cannot add a subtask to someone else's task",
-      !!checklistOnOthers.error,
-      checklistOnOthers.error?.message ?? "NO ERROR — members can edit any checklist",
+      "member can add a subtask to someone else's task",
+      !checklistOnOthers.error,
+      checklistOnOthers.error?.message ?? "inserted",
     );
 
-    // Planted by the admin so the member has something they may not touch.
+    // Planted by the admin, then managed by the member — which is the point of
+    // the change: a checklist is the work, and members do the work.
     const { data: foreignItem } = await admin
       .from("task_checklist_items")
       .insert({
@@ -877,14 +987,24 @@ if (!serviceKey) {
       .select("id")
       .single();
 
+    const foreignRead = await member
+      .from("task_checklist_items")
+      .select("id")
+      .eq("id", foreignItem.id);
+    check(
+      "member can read a subtask on someone else's task",
+      (foreignRead.data?.length ?? 0) === 1,
+      foreignRead.error?.message ?? `rows: ${foreignRead.data?.length}`,
+    );
+
     const foreignToggle = await member
       .from("task_checklist_items")
       .update({ is_done: true })
       .eq("id", foreignItem.id)
       .select("id");
     check(
-      "member cannot tick a subtask on someone else's task",
-      (foreignToggle.data?.length ?? 0) === 0,
+      "member can tick a subtask on someone else's task",
+      (foreignToggle.data?.length ?? 0) === 1,
       foreignToggle.error?.message ?? `rows affected: ${foreignToggle.data?.length}`,
     );
 
@@ -894,19 +1014,9 @@ if (!serviceKey) {
       .eq("id", foreignItem.id)
       .select("id");
     check(
-      "member cannot delete a subtask on someone else's task",
-      (foreignDelete.data?.length ?? 0) === 0,
+      "member can delete a subtask on someone else's task",
+      (foreignDelete.data?.length ?? 0) === 1,
       foreignDelete.error?.message ?? `rows affected: ${foreignDelete.data?.length}`,
-    );
-
-    const foreignRead = await member
-      .from("task_checklist_items")
-      .select("id")
-      .eq("id", foreignItem.id);
-    check(
-      "member can still read that subtask",
-      (foreignRead.data?.length ?? 0) === 1,
-      foreignRead.error?.message ?? `rows: ${foreignRead.data?.length}`,
     );
 
     // completed_at is stamped by the database, exactly as on tasks.

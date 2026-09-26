@@ -31,7 +31,7 @@ import {
 } from "@/features/tasks/schema";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
-import { atLeast, canEditTask } from "@/lib/permissions";
+import { atLeast, can } from "@/lib/permissions";
 
 export async function generateMetadata(
   props: PageProps<"/tasks/[id]">,
@@ -69,7 +69,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[id]">) {
   const due = task.due_at ? new Date(task.due_at) : null;
   const overdue = due && isPast(due) && task.status !== "done";
 
-  const mayEdit = canEditTask(actor, { assigneeIds: task.assigneeIds });
+  const mayEdit = can(actor, "update", "task");
 
   return (
     <>

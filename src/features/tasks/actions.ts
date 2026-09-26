@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { fail, ok, type ActionResult } from "@/lib/action-result";
 import { getCurrentUser } from "@/lib/auth";
-import { atLeast, canEditTask } from "@/lib/permissions";
+import { atLeast, can } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { fieldErrorsFromZod, firstIssueMessage } from "@/lib/zod";
 
@@ -124,15 +124,8 @@ export async function updateTask(
 
   // Checked here for a clear message; `guard_task_edit` enforces it regardless,
   // which is what protects a direct PATCH that never reaches this function.
-  const { data: existingAssignees } = await supabase
-    .from("task_assignees")
-    .select("user_id")
-    .eq("task_id", parsed.data.id);
-
-  const assigneeIds = (existingAssignees ?? []).map((row) => row.user_id);
-
-  if (!canEditTask(actor, { assigneeIds })) {
-    return fail("You can only edit tasks assigned to you.");
+  if (!can(actor, "update", "task")) {
+    return fail("You do not have permission to edit tasks.");
   }
 
   const { error } = await supabase
@@ -142,22 +135,33 @@ export async function updateTask(
 
   if (error) return fail(error.message);
 
-  // Reassignment is manager work. A member editing their own task keeps the
-  // assignment it already has rather than being silently unassigned.
-  const wantedAssignee = parsed.data.values.assigneeId;
-  const currentAssignee = assigneeIds[0] ?? null;
+  // Reassignment is still manager work, even though editing is not. A member
+  // editing a task keeps whatever assignment it already has rather than
+  // silently clearing it.
+  //
+  // The lookup sits inside the branch: members never reassign, so they should
+  // not pay a round trip to Seoul to establish that.
+  if (atLeast(actor.role, "manager")) {
+    const { data: current } = await supabase
+      .from("task_assignees")
+      .select("user_id")
+      .eq("task_id", parsed.data.id);
 
-  if (wantedAssignee !== currentAssignee && atLeast(actor.role, "manager")) {
-    await supabase.from("task_assignees").delete().eq("task_id", parsed.data.id);
+    const currentAssignee = current?.[0]?.user_id ?? null;
+    const wantedAssignee = parsed.data.values.assigneeId;
 
-    if (wantedAssignee) {
-      const { error: assignError } = await supabase.from("task_assignees").insert({
-        task_id: parsed.data.id,
-        user_id: wantedAssignee,
-        workspace_id: actor.workspace_id,
-        assigned_by: actor.id,
-      });
-      if (assignError) return fail(assignError.message);
+    if (wantedAssignee !== currentAssignee) {
+      await supabase.from("task_assignees").delete().eq("task_id", parsed.data.id);
+
+      if (wantedAssignee) {
+        const { error: assignError } = await supabase.from("task_assignees").insert({
+          task_id: parsed.data.id,
+          user_id: wantedAssignee,
+          workspace_id: actor.workspace_id,
+          assigned_by: actor.id,
+        });
+        if (assignError) return fail(assignError.message);
+      }
     }
   }
 
@@ -212,13 +216,8 @@ export async function moveTask(
 
   const supabase = await createClient();
 
-  const { data: assignees } = await supabase
-    .from("task_assignees")
-    .select("user_id")
-    .eq("task_id", parsed.data.id);
-
-  if (!canEditTask(actor, { assigneeIds: (assignees ?? []).map((r) => r.user_id) })) {
-    return fail("You can only move tasks assigned to you.");
+  if (!can(actor, "update", "task")) {
+    return fail("You do not have permission to move tasks.");
   }
 
   const { error } = await supabase
@@ -266,27 +265,18 @@ export async function setTaskDeleted(
 // database enforces it too, in `can_edit_task` — these exist so a refusal
 // arrives as a sentence rather than as a policy violation.
 
-/** Shared preamble: an active actor who is allowed to edit this task. */
-async function requireTaskEditor(taskId: string) {
+/** Shared preamble: an active actor who is allowed to edit tasks. */
+async function requireTaskEditor() {
   const actor = await getCurrentUser();
   if (!actor || actor.status !== "active") {
     return { ok: false as const, error: "Your session has expired. Sign in again." };
   }
 
-  const supabase = await createClient();
-
-  const { data: assignees } = await supabase
-    .from("task_assignees")
-    .select("user_id")
-    .eq("task_id", taskId);
-
-  if (
-    !canEditTask(actor, {
-      assigneeIds: (assignees ?? []).map((row) => row.user_id),
-    })
-  ) {
-    return { ok: false as const, error: "You can only change tasks assigned to you." };
+  if (!can(actor, "update", "task")) {
+    return { ok: false as const, error: "You do not have permission to change tasks." };
   }
+
+  const supabase = await createClient();
 
   return { ok: true as const, actor, supabase };
 }
@@ -302,7 +292,7 @@ export async function addChecklistItem(
     );
   }
 
-  const gate = await requireTaskEditor(parsed.data.taskId);
+  const gate = await requireTaskEditor();
   if (!gate.ok) return fail(gate.error);
 
   // Appended to the end. The last position plus a gap, so inserting between
@@ -349,7 +339,7 @@ export async function setChecklistItemDone(
 
   if (!item) return fail("That item no longer exists.");
 
-  const gate = await requireTaskEditor(item.task_id);
+  const gate = await requireTaskEditor();
   if (!gate.ok) return fail(gate.error);
 
   const { error } = await gate.supabase
@@ -379,7 +369,7 @@ export async function removeChecklistItem(
 
   if (!item) return fail("That item no longer exists.");
 
-  const gate = await requireTaskEditor(item.task_id);
+  const gate = await requireTaskEditor();
   if (!gate.ok) return fail(gate.error);
 
   // Hard delete, by the reasoning in migration 0018: a checklist item is a

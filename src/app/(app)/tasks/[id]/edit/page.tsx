@@ -12,7 +12,7 @@ import { getTask } from "@/features/tasks/queries";
 import type { TaskPriority, TaskStatus } from "@/features/tasks/schema";
 import { listAssignableUsers } from "@/features/users/queries";
 import { requireUser } from "@/lib/auth";
-import { atLeast, canEditTask } from "@/lib/permissions";
+import { atLeast, can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Edit task" };
 
@@ -31,7 +31,7 @@ export default async function EditTaskPage(props: PageProps<"/tasks/[id]/edit">)
 
   // The database enforces this too; redirecting is the courtesy of not showing
   // someone a form that cannot be submitted.
-  if (!canEditTask(actor, { assigneeIds: task.assigneeIds })) {
+  if (!can(actor, "update", "task")) {
     redirect(`/tasks/${id}`);
   }
 
