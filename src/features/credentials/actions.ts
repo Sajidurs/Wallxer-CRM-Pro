@@ -55,6 +55,7 @@ export async function createCredential(
     p_secret: parsed.data.secret,
     p_notes: parsed.data.notes,
     p_contact_id: parsed.data.contactId,
+    p_kind: parsed.data.kind,
   } as never);
 
   if (error) return fail(error.message);
@@ -91,6 +92,7 @@ export async function updateCredential(
     p_secret: parsed.data.secret,
     p_notes: parsed.data.notes,
     p_clear_notes: parsed.data.clearNotes,
+    p_kind: parsed.data.kind,
   } as never);
 
   if (error) return fail(error.message);

@@ -398,6 +398,7 @@ export type Database = {
           created_by: string | null
           deleted_at: string | null
           id: string
+          kind: Database["public"]["Enums"]["credential_kind"]
           label: string
           notes_encrypted: string | null
           project_id: string | null
@@ -414,6 +415,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           id?: string
+          kind?: Database["public"]["Enums"]["credential_kind"]
           label: string
           notes_encrypted?: string | null
           project_id?: string | null
@@ -430,6 +432,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           id?: string
+          kind?: Database["public"]["Enums"]["credential_kind"]
           label?: string
           notes_encrypted?: string | null
           project_id?: string | null
@@ -1855,6 +1858,7 @@ export type Database = {
         Args: {
           p_category: Database["public"]["Enums"]["credential_category"]
           p_contact_id?: string
+          p_kind?: Database["public"]["Enums"]["credential_kind"]
           p_label: string
           p_notes?: string
           p_project_id: string
@@ -1914,6 +1918,7 @@ export type Database = {
           p_category: Database["public"]["Enums"]["credential_category"]
           p_clear_notes?: boolean
           p_id: string
+          p_kind?: Database["public"]["Enums"]["credential_kind"]
           p_label: string
           p_notes?: string
           p_secret?: string
@@ -1935,6 +1940,7 @@ export type Database = {
         | "analytics"
         | "social"
         | "other"
+      credential_kind: "stored" | "link"
       deal_status: "open" | "won" | "lost"
       invoice_currency: "BDT" | "USD" | "EUR" | "GBP"
       invoice_status: "draft" | "sent" | "paid" | "cancelled"
@@ -2099,6 +2105,7 @@ export const Constants = {
         "social",
         "other",
       ],
+      credential_kind: ["stored", "link"],
       deal_status: ["open", "won", "lost"],
       invoice_currency: ["BDT", "USD", "EUR", "GBP"],
       invoice_status: ["draft", "sent", "paid", "cancelled"],

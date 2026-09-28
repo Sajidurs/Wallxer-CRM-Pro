@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
  * all, so asking for them fails rather than silently returning bytes.
  */
 const LIST_COLUMNS =
-  "id, project_id, contact_id, label, category, url, username, created_at, updated_at, created_by";
+  "id, project_id, contact_id, label, category, kind, url, username, created_at, updated_at, created_by";
 
 export interface CredentialListItem {
   id: string;
@@ -19,6 +19,7 @@ export interface CredentialListItem {
   contact_id: string | null;
   label: string;
   category: string;
+  kind: "stored" | "link";
   url: string | null;
   username: string | null;
   created_at: string;

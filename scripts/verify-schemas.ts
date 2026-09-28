@@ -30,6 +30,10 @@ import {
   updateContactSchema,
 } from "../src/features/contacts/schema";
 import {
+  createCredentialSchema,
+  updateCredentialSchema,
+} from "../src/features/credentials/schema";
+import {
   brandSchema,
   updateBrandSchema,
 } from "../src/features/brands/schema";
@@ -387,6 +391,52 @@ const cases: Case[] = [
     name: "invoiceFiltersSchema",
     schema: invoiceFiltersSchema,
     input: { q: "WLX", status: "paid" },
+  },
+  {
+    // These were never covered, and now carry a superRefine on top of the
+    // transforms — exactly where a second parse tends to come apart.
+    name: "createCredentialSchema (stored)",
+    schema: createCredentialSchema,
+    input: {
+      projectId: UUID,
+      contactId: null,
+      label: "  cPanel — main hosting  ",
+      category: "hosting",
+      kind: "stored",
+      url: "https://cpanel.example.com",
+      username: "admin",
+      secret: "s3cret",
+      notes: "",
+    },
+  },
+  {
+    name: "createCredentialSchema (vault link)",
+    schema: createCredentialSchema,
+    input: {
+      projectId: UUID,
+      label: "Client passwords sheet",
+      category: "other",
+      kind: "link",
+      url: "",
+      username: "",
+      secret: "https://docs.google.com/spreadsheets/d/abc123/edit",
+      notes: "Tab 2, row 8",
+    },
+  },
+  {
+    name: "updateCredentialSchema (blank secret keeps it)",
+    schema: updateCredentialSchema,
+    input: {
+      id: UUID,
+      label: "cPanel",
+      category: "hosting",
+      kind: "link",
+      url: "",
+      username: "",
+      secret: "",
+      notes: "",
+      clearNotes: false,
+    },
   },
   {
     name: "taskFiltersSchema",

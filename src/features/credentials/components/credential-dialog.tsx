@@ -4,7 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { ExternalLink, KeyRound } from "lucide-react";
+import { Controller, useForm, useWatch } from "react-hook-form";
+
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -39,11 +42,14 @@ import type { CredentialListItem } from "../queries";
 import {
   CATEGORY_LABELS,
   CREDENTIAL_CATEGORIES,
+  CREDENTIAL_KINDS,
+  KIND_LABELS,
   createCredentialSchema,
   updateCredentialSchema,
   type CreateCredentialInput,
   type CreateCredentialValues,
   type CredentialCategory,
+  type CredentialKind,
   type UpdateCredentialInput,
   type UpdateCredentialValues,
 } from "../schema";
@@ -80,6 +86,7 @@ function CreateForm({
       projectId,
       label: "",
       category: "other",
+      kind: "stored",
       url: "",
       username: "",
       secret: "",
@@ -87,6 +94,9 @@ function CreateForm({
       contactId: null,
     },
   });
+
+  // Decides what the rest of the form means, so the fields below follow it.
+  const kind = useWatch({ control, name: "kind" }) ?? "stored";
 
   async function onSubmit(values: CreateCredentialValues) {
     setFormError(null);
@@ -145,36 +155,66 @@ function CreateForm({
           )}
         />
 
+        <Controller
+          control={control}
+          name="kind"
+          render={({ field }) => <KindChoice value={field.value ?? "stored"} onChange={field.onChange} />}
+        />
+
         <Field>
           <FieldLabel htmlFor="credUrl">Login URL</FieldLabel>
           <Input id="credUrl" placeholder="https://" {...register("url")} />
+          {kind === "link" && (
+            <FieldDescription>
+              Where the credential is used, not where it is kept.
+            </FieldDescription>
+          )}
         </Field>
 
-        <Field>
-          <FieldLabel htmlFor="credUsername">Username</FieldLabel>
-          <Input id="credUsername" autoComplete="off" {...register("username")} />
-          <FieldDescription>
-            Not encrypted. Usernames are not secrets, and being able to read them
-            keeps the list useful.
-          </FieldDescription>
-        </Field>
+        {kind === "stored" && (
+          <Field>
+            <FieldLabel htmlFor="credUsername">Username</FieldLabel>
+            <Input id="credUsername" autoComplete="off" {...register("username")} />
+            <FieldDescription>
+              Not encrypted. Usernames are not secrets, and being able to read them
+              keeps the list useful.
+            </FieldDescription>
+          </Field>
+        )}
 
         <Field data-invalid={!!errors.secret}>
-          <FieldLabel htmlFor="credSecret">Password or key</FieldLabel>
+          <FieldLabel htmlFor="credSecret">
+            {kind === "link" ? "Vault link" : "Password or key"}
+          </FieldLabel>
           <Input
             id="credSecret"
-            type="password"
-            autoComplete="new-password"
+            // A URL is not hidden while typing: you have to be able to see that
+            // you pasted the right one.
+            type={kind === "link" ? "text" : "password"}
+            autoComplete={kind === "link" ? "off" : "new-password"}
+            placeholder={kind === "link" ? "https://docs.google.com/spreadsheets/d/..." : undefined}
             aria-invalid={!!errors.secret}
             {...register("secret")}
           />
+          {kind === "link" && (
+            <FieldDescription>
+              Encrypted and revealed exactly like a password, so the link never
+              sits in the page or in a backup in the clear.
+            </FieldDescription>
+          )}
           <FieldError errors={[errors.secret]} />
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="credNotes">Recovery codes or extra keys</FieldLabel>
+          <FieldLabel htmlFor="credNotes">
+            {kind === "link" ? "Notes" : "Recovery codes or extra keys"}
+          </FieldLabel>
           <Textarea id="credNotes" rows={3} {...register("notes")} />
-          <FieldDescription>Encrypted alongside the password.</FieldDescription>
+          <FieldDescription>
+            {kind === "link"
+              ? "Encrypted alongside the link — which tab, which row."
+              : "Encrypted alongside the password."}
+          </FieldDescription>
         </Field>
       </FieldGroup>
 
@@ -217,8 +257,11 @@ function EditForm({
       secret: "",
       notes: "",
       clearNotes: false,
+      kind: (credential.kind ?? "stored") as CredentialKind,
     },
   });
+
+  const kind = useWatch({ control, name: "kind" }) ?? "stored";
 
   async function onSubmit(values: UpdateCredentialValues) {
     setFormError(null);
@@ -276,35 +319,54 @@ function EditForm({
           )}
         />
 
+        <Controller
+          control={control}
+          name="kind"
+          render={({ field }) => (
+            <KindChoice value={field.value ?? "stored"} onChange={field.onChange} />
+          )}
+        />
+
         <Field>
           <FieldLabel htmlFor="credUrlEdit">Login URL</FieldLabel>
           <Input id="credUrlEdit" placeholder="https://" {...register("url")} />
         </Field>
 
-        <Field>
-          <FieldLabel htmlFor="credUsernameEdit">Username</FieldLabel>
-          <Input id="credUsernameEdit" autoComplete="off" {...register("username")} />
-        </Field>
+        {kind === "stored" && (
+          <Field>
+            <FieldLabel htmlFor="credUsernameEdit">Username</FieldLabel>
+            <Input id="credUsernameEdit" autoComplete="off" {...register("username")} />
+          </Field>
+        )}
 
         <Field data-invalid={!!errors.secret}>
-          <FieldLabel htmlFor="credSecretEdit">Password or key</FieldLabel>
+          <FieldLabel htmlFor="credSecretEdit">
+            {kind === "link" ? "Vault link" : "Password or key"}
+          </FieldLabel>
           <Input
             id="credSecretEdit"
-            type="password"
-            autoComplete="new-password"
-            placeholder="Leave blank to keep the current one"
+            type={kind === "link" ? "text" : "password"}
+            autoComplete={kind === "link" ? "off" : "new-password"}
+            placeholder={
+              kind === "link"
+                ? "Leave blank to keep the current link"
+                : "Leave blank to keep the current one"
+            }
             aria-invalid={!!errors.secret}
             {...register("secret")}
           />
           <FieldDescription>
-            Blank keeps what is stored. The existing value is never shown here,
-            so correcting a label does not require revealing the password.
+            {kind === "link"
+              ? "Blank keeps the stored link. Changing this to a stored password replaces the link with whatever you type here."
+              : "Blank keeps what is stored. The existing value is never shown here, so correcting a label does not require revealing the password."}
           </FieldDescription>
           <FieldError errors={[errors.secret]} />
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="credNotesEdit">Recovery codes or extra keys</FieldLabel>
+          <FieldLabel htmlFor="credNotesEdit">
+            {kind === "link" ? "Notes" : "Recovery codes or extra keys"}
+          </FieldLabel>
           <Textarea
             id="credNotesEdit"
             rows={3}
@@ -370,5 +432,56 @@ export function CredentialDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Where the secret actually lives.
+ *
+ * Two buttons rather than a dropdown, because this is the most consequential
+ * choice on the form and each option needs a sentence explaining what it costs
+ * you — a select would hide both behind a chevron.
+ */
+function KindChoice({
+  value,
+  onChange,
+}: {
+  value: CredentialKind;
+  onChange: (value: CredentialKind) => void;
+}) {
+  return (
+    <Field>
+      <FieldLabel>Where the secret lives</FieldLabel>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {CREDENTIAL_KINDS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onChange(option)}
+            aria-pressed={value === option}
+            className={cn(
+              "rounded-lg border p-3 text-left transition-colors",
+              value === option
+                ? "border-foreground/20 bg-accent"
+                : "border-border hover:bg-accent/50",
+            )}
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              {option === "link" ? (
+                <ExternalLink className="size-3.5" />
+              ) : (
+                <KeyRound className="size-3.5" />
+              )}
+              {KIND_LABELS[option]}
+            </span>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              {option === "link"
+                ? "Keep the password in a Google Sheet or Doc. This app stores only an encrypted pointer, so a breach here yields no password."
+                : "Encrypted in this database with a key held outside it. Revealed for thirty seconds, and every reveal is logged."}
+            </span>
+          </button>
+        ))}
+      </div>
+    </Field>
   );
 }

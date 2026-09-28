@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import {
   Check,
   Copy,
+  ExternalLink,
   Eye,
   EyeOff,
   Loader2,
@@ -15,6 +16,7 @@ import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -61,6 +63,10 @@ export function CredentialCard({
   const [isPending, startTransition] = useTransition();
 
   const remaining = revealed ? Math.max(0, revealed.expiresAt - now) : 0;
+
+  // A vault link is a credential whose secret is a URL. Everything about how
+  // it is stored and revealed is identical; only the presentation differs.
+  const isLink = credential.kind === "link";
 
   /**
    * SYSTEM_DESIGN 7.3: a revealed value lives in component state and clears
@@ -149,6 +155,14 @@ export function CredentialCard({
                 {CATEGORY_LABELS[credential.category as CredentialCategory] ??
                   credential.category}
               </Badge>
+              {/* Worth saying on the card: it tells you whether the password is
+                  thirty seconds away or behind a Google login. */}
+              {isLink && (
+                <Badge variant="secondary" className="gap-1">
+                  <ExternalLink className="size-3" />
+                  Vault link
+                </Badge>
+              )}
             </div>
             {credential.url && (
               <a
@@ -195,7 +209,9 @@ export function CredentialCard({
         </div>
 
         <dl className="grid gap-1 text-sm">
-          <div className="flex items-center gap-2">
+          {/* A vault link has no username here — the account that matters is
+              the Google one, which this app deliberately knows nothing about. */}
+          <div className={cn("flex items-center gap-2", isLink && "hidden")}>
             <dt className="w-20 shrink-0 text-xs text-muted-foreground">Username</dt>
             <dd className="min-w-0 flex-1 truncate font-mono text-xs">
               {credential.username || <span className="text-muted-foreground">—</span>}
@@ -214,10 +230,26 @@ export function CredentialCard({
           </div>
 
           <div className="flex items-center gap-2">
-            <dt className="w-20 shrink-0 text-xs text-muted-foreground">Password</dt>
+            <dt className="w-20 shrink-0 text-xs text-muted-foreground">
+              {isLink ? "Vault" : "Password"}
+            </dt>
             <dd className="min-w-0 flex-1 truncate font-mono text-xs">
               {revealed ? (
-                revealed.data.secret
+                isLink ? (
+                  // Opened in a new tab, and `noreferrer` so the vault is never
+                  // told which CRM page the visitor came from.
+                  <a
+                    href={revealed.data.secret}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1 underline decoration-border underline-offset-[3px] hover:decoration-foreground"
+                  >
+                    Open the vault
+                    <ExternalLink className="size-3" />
+                  </a>
+                ) : (
+                  revealed.data.secret
+                )
               ) : (
                 <span className="tracking-widest text-muted-foreground">••••••••••</span>
               )}
@@ -230,7 +262,7 @@ export function CredentialCard({
                   size="icon"
                   className="size-7"
                   onClick={() => copy(revealed.data.secret, "secret")}
-                  aria-label="Copy password"
+                  aria-label={isLink ? "Copy vault link" : "Copy password"}
                 >
                   {copied === "secret" ? <Check className="text-green-600" /> : <Copy />}
                 </Button>
@@ -239,7 +271,7 @@ export function CredentialCard({
                   size="icon"
                   className="size-7"
                   onClick={hide}
-                  aria-label="Hide password"
+                  aria-label={isLink ? "Hide the link" : "Hide password"}
                 >
                   <EyeOff />
                 </Button>
@@ -252,8 +284,8 @@ export function CredentialCard({
                 onClick={reveal}
                 disabled={isPending}
               >
-                {isPending ? <Loader2 className="animate-spin" /> : <Eye />}
-                Reveal
+                {isPending ? <Loader2 className="animate-spin" /> : isLink ? <ExternalLink /> : <Eye />}
+                {isLink ? "Get the link" : "Reveal"}
               </Button>
             )}
           </div>

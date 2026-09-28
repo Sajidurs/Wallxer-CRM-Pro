@@ -101,6 +101,7 @@ Update this file at the end of every work session, before you stop.
 | `0021_member_permissions.sql` | Yes, 2026-09-26            |
 | `0022_avatar_cleanup.sql` | Yes, 2026-09-26                |
 | `0023_invoices.sql`    | Yes, 2026-09-27                   |
+| `0024_credential_vault_links.sql` | Yes, 2026-09-28       |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -161,6 +162,66 @@ can be commented on, and one search box finds anything.
 ---
 
 ## Unreleased
+
+### 2026-09-28 — A credential can point at an external vault
+
+**Added**
+
+By decision: some client passwords should not live in this system at all. A credential can now be a
+link to a Google Sheet or Doc instead of the secret itself, so a compromise here yields a pointer
+rather than a password, and reaching the real thing needs a Google account this application never
+holds.
+
+- **A choice on the credential form**: store the secret here, or link to an external vault. Two
+  buttons with a sentence each, rather than a dropdown — it is the most consequential field on the
+  form and each option has a cost worth reading.
+- **`credentials.kind`** (`stored` | `link`), and a **Vault link** badge on the card so you can see
+  at a glance whether a password is thirty seconds away or behind a Google login.
+- Revealing a link gives **Open the vault**, opened in a new tab with `noreferrer` so the vault is
+  never told which page the visitor came from.
+
+**Notes:**
+
+- **The link is stored exactly like a secret** — encrypted with the same key, revealed through the
+  same logged function, never rendered into the page until someone asks. That was the one real
+  design decision here. A plain `vault_url` column would have put the URL in the clear in every
+  backup and in every row a leaked key could read, which matters precisely because a sheet shared as
+  "anyone with the link" makes the URL itself the credential.
+- So a link credential is a credential whose secret happens to be a URL, plus a flag saying so.
+  Everything already built applies unchanged: pgcrypto, the access log, the thirty-second reveal,
+  and the column grants that stop a client asking for `secret_encrypted` at all. The migration is
+  one enum, one column, and two function bodies.
+- Both write functions were rebuilt from **0021's** bodies — the newest — not 0006's or 0007's. They
+  were dropped and recreated rather than replaced, because adding a parameter makes a new signature
+  and `create or replace` would have left the old function beside the new one for a named-argument
+  call to match either.
+- A vault link is validated harder than a password: it must be an `https://` URL. A typo in a
+  password is discovered the moment someone tries it; a typo in a vault link is discovered when
+  somebody urgently needs the password and cannot find it.
+- The credential schemas were **never covered by `verify:schemas`** and now are, which mattered
+  because they gained a `superRefine` on top of their transforms. 39/39 idempotent.
+- Verified end to end: the URL is absent from the stored ciphertext and from the page source, a
+  client cannot select the ciphertext column at all, creating and revealing both write access-log
+  rows, and an empty link is refused. 12 of 13 — and the one failure was the test, not the code.
+- **That failure is worth recording.** The credentials panel lives in a Radix tab that only mounts
+  when selected, and Radix ignores a synthetic `.click()`; it listens for real pointer events. The
+  browser check had to dispatch actual mouse events through the DevTools Protocol. Until it did, the
+  panel was empty and every assertion about it failed for a reason that had nothing to do with the
+  feature. 9 of 9 once the tab actually opened.
+- The existing stored credential was untouched and still reads as `stored`; the column defaults that
+  way, so nothing had to be migrated.
+
+**A caveat worth stating plainly:** this only achieves what it is for if the sheet is shared with
+named people. A sheet set to "anyone with the link" turns the link into the password, and then this
+is weaker than storing the secret encrypted here, not stronger.
+
+**Files touched:** `supabase/migrations/0024_credential_vault_links.sql`,
+`src/features/credentials/{schema,queries,actions}.ts`,
+`src/features/credentials/components/{credential-dialog,credential-card}.tsx`,
+`scripts/verify-schemas.ts`
+
+**Migration:** 0024_credential_vault_links.sql — applied
+
 
 ### 2026-09-27 — Invoices, and brands becoming companies
 
