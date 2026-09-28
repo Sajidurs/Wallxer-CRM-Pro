@@ -305,17 +305,19 @@ export function TaskForm({
               </Field>
             </div>
 
-            <Field data-invalid={!!errors.estimatedMinutes}>
-              <FieldLabel htmlFor="estimatedMinutes">Estimate, in minutes</FieldLabel>
+            <Field data-invalid={!!errors.estimatedHours}>
+              <FieldLabel htmlFor="estimatedHours">Estimate, in hours</FieldLabel>
               <Input
-                id="estimatedMinutes"
+                id="estimatedHours"
                 type="number"
-                min={1}
+                min={0.25}
+                step={0.25}
+                placeholder="1.5"
                 className="sm:w-48"
-                aria-invalid={!!errors.estimatedMinutes}
-                {...register("estimatedMinutes")}
+                aria-invalid={!!errors.estimatedHours}
+                {...register("estimatedHours")}
               />
-              <FieldError errors={[errors.estimatedMinutes]} />
+              <FieldError errors={[errors.estimatedHours]} />
             </Field>
           </FieldGroup>
         </CardContent>

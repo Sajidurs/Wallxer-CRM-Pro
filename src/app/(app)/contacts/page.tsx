@@ -1,4 +1,4 @@
-import { Plus, Upload, Users } from "lucide-react";
+import { Download, Plus, Upload, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -54,22 +54,32 @@ export default async function ContactsPage(props: PageProps<"/contacts">) {
         title="Contacts"
         description="Every person and company across all brands."
         actions={
-          canCreate && (
-            <>
-              <Button asChild variant="outline">
-                <Link href="/contacts/import">
-                  <Upload />
-                  Import
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link href="/contacts/new">
-                  <Plus />
-                  New contact
-                </Link>
-              </Button>
-            </>
-          )
+          <>
+            {/* A plain anchor, not a Link: this is a file download, and client
+                navigation would try to render the CSV as a page. */}
+            <Button asChild variant="outline">
+              <a href="/api/contacts/export" download>
+                <Download />
+                Export
+              </a>
+            </Button>
+            {canCreate && (
+              <>
+                <Button asChild variant="outline">
+                  <Link href="/contacts/import">
+                    <Upload />
+                    Import
+                  </Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/contacts/new">
+                    <Plus />
+                    New contact
+                  </Link>
+                </Button>
+              </>
+            )}
+          </>
         }
       />
 

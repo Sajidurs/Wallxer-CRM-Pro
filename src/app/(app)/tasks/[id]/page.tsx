@@ -25,6 +25,7 @@ import { TaskActions } from "@/features/tasks/components/task-actions";
 import { TaskChecklist } from "@/features/tasks/components/task-checklist";
 import { getTask, listChecklistItems } from "@/features/tasks/queries";
 import {
+  formatEstimate,
   TASK_PRIORITY_LABELS,
   TASK_STATUS_LABELS,
   type TaskPriority,
@@ -227,7 +228,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[id]">) {
                 <Timer className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                 <div>
                   <div className="text-xs text-muted-foreground">Estimate</div>
-                  {task.estimated_minutes} minutes
+                  {formatEstimate(task.estimated_minutes)}
                 </div>
               </div>
             )}

@@ -284,3 +284,12 @@ export const importOptionsSchema = z.object({
 });
 
 export type ImportOptions = z.output<typeof importOptionsSchema>;
+
+/** RFC 4180 quoting — the inverse of `parseCsv`, used by the exporter. */
+export function toCsvCell(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+export function rowsToCsv(rows: string[][]): string {
+  return rows.map((row) => row.map(toCsvCell).join(",")).join("\n");
+}

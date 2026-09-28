@@ -66,7 +66,9 @@ export default async function EditTaskPage(props: PageProps<"/tasks/[id]/edit">)
             assigneeId: task.assigneeIds[0] ?? null,
             startAt: toLocalInput(task.start_at),
             dueAt: toLocalInput(task.due_at),
-            estimatedMinutes: task.estimated_minutes ?? "",
+            // Stored in minutes, edited in hours.
+            estimatedHours:
+              task.estimated_minutes === null ? "" : task.estimated_minutes / 60,
             links: links.map((link) => ({
               kind: link.kind as LinkKind,
               name: link.name,

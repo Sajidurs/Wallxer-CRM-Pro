@@ -59,16 +59,25 @@ export const taskSchema = z
     // the field sends "". `.optional()` on the union rather than a
     // `z.undefined()` member: in Zod 4 a union containing undefined still
     // requires the key to be present, so omitting it entirely was rejected.
-    estimatedMinutes: z
+    /**
+     * Hours, because that is how anyone actually estimates work. The column
+     * stays `estimated_minutes`: integer minutes hold half an hour exactly,
+     * where a float of hours would not, and `actual_minutes` next to it is
+     * already in the same unit. The single conversion lives in `toRow`.
+     */
+    estimatedHours: z
       .union([z.string(), z.number(), z.null()])
       .optional()
       .transform((value) => {
         if (value === null || value === undefined || value === "") return null;
         const n = typeof value === "number" ? value : Number(value);
-        return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+        if (!Number.isFinite(n) || n <= 0) return null;
+        // Quarter-hour resolution: 0.25 is fifteen minutes, and anything finer
+        // is a precision nobody estimating in hours actually means.
+        return Math.round(n * 4) / 4;
       })
       .refine(
-        (value) => value === null || value <= 100000,
+        (value) => value === null || value <= 1000,
         "That estimate is unrealistically large",
       ),
     links: z.array(draftLinkSchema).max(25, "That is a lot of links").default([]),
@@ -164,3 +173,14 @@ export const toggleChecklistItemSchema = z.object({
 export const removeChecklistItemSchema = z.object({
   id: z.uuid(),
 });
+
+/**
+ * Minutes as the hours someone typed: 90 reads as "1.5 hours", 60 as "1 hour".
+ * The trailing `.0` is dropped, because "2.0 hours" looks like a measurement
+ * rather than an estimate.
+ */
+export function formatEstimate(minutes: number): string {
+  const hours = minutes / 60;
+  const text = Number.isInteger(hours) ? String(hours) : hours.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  return `${text} ${hours === 1 ? "hour" : "hours"}`;
+}

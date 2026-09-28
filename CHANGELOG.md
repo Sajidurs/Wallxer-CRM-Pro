@@ -163,6 +163,63 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-28 — Excel import, contact export, and estimates in hours
+
+**Added**
+
+- **Excel upload for the contact importer.** Drop an `.xlsx` on the same page as a CSV; everything
+  from the mapping step onwards is the path that already existed.
+- **Export contacts as CSV**, from a button on the contacts page.
+
+**Changed**
+
+- **Task estimates are entered and shown in hours**, not minutes, in quarter-hour steps.
+
+**Notes:**
+
+- **The spreadsheet is converted to CSV on the server, not in the browser.** The importer already
+  had a parser, a mapping screen and a server action that re-parses whatever the browser sent; an
+  `.xlsx` is turned into CSV by `/api/contacts/xlsx` and fed into that. Excel and CSV therefore share
+  one path from mapping onwards, so there is no second place for the two to disagree — and no
+  spreadsheet library ships to visitors of a page most of them never open.
+- **`read-excel-file` rather than the obvious choices.** This project has its own CSV parser because
+  CSV is thirty lines and a dependency would be larger than the problem. An `.xlsx` is a ZIP of XML
+  with shared string tables, so the calculus inverts. `exceljs` was tried first and rejected: it
+  pulls a `uuid` with an open advisory, and a permanent `npm audit` warning on a codebase holding
+  client credentials is a poor trade for a file format. `read-excel-file` is read-only, focused, and
+  audits clean.
+- **The export's columns are the importer's own field labels, in its order**, so an export can be
+  opened, edited and imported straight back without remapping a column. A format you can only read
+  is half a feature. Verified: all sixteen importable columns auto-map, none claimed twice.
+- The export carries a UTF-8 BOM. Without it Excel on Windows reads the file as the system codepage
+  and turns every non-Latin name into mojibake.
+- Tags export joined with semicolons, because the importer splits on them and a comma would need
+  quoting to survive its own column.
+- The export reads through the signed-in user's client, so RLS decides what leaves the building.
+  An export is exactly the wrong place to reach for the service role.
+- **Only the first sheet is imported.** A workbook's later tabs are usually notes or a pivot, and
+  silently concatenating them would invent contacts nobody listed.
+- **Estimates: hours in the interface, minutes in the column.** `estimated_minutes` stays as it is —
+  integer minutes hold half an hour exactly where a float of hours would not, and `actual_minutes`
+  beside it is already the same unit. The conversion lives in one place, in `toRow`. 90 minutes
+  reads as "1.5 hours"; 60 as "1 hour", singular.
+- Verified end to end: a hand-built `.xlsx` round trips with a leading-zero phone number intact, an
+  embedded comma quoted, blank rows dropped and the sheet name reported; a non-spreadsheet is
+  refused; a logged-out export is turned away. 15 of 16, and the one failure was the assertion —
+  `Response.text()` strips a BOM while decoding, so the check had to read the raw bytes, which are
+  `ef bb bf`.
+- The estimate change was confirmed in a browser as well, because React Hook Form applies its
+  defaults on mount: the edit form's input is empty in the server-rendered HTML and holds `1.5` once
+  hydrated. Checking the markup would have reported a bug that is not there.
+
+**Files touched:** `src/features/contacts/import/{xlsx.ts,csv.ts,components/import-wizard.tsx}`,
+`src/app/api/contacts/{xlsx,export}/route.ts`, `src/app/(app)/contacts/page.tsx`,
+`src/features/tasks/{schema,actions}.ts`, `src/features/tasks/components/task-form.tsx`,
+`src/app/(app)/tasks/**`, `scripts/verify-schemas.ts`
+
+**Migration:** none
+
+
 ### 2026-09-28 — A credential can point at an external vault
 
 **Added**

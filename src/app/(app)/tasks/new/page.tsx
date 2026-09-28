@@ -50,7 +50,7 @@ export default async function NewTaskPage(props: PageProps<"/tasks/new">) {
             assigneeId: actor.id,
             startAt: "",
             dueAt: "",
-            estimatedMinutes: "",
+            estimatedHours: "",
             links: [],
           }}
         />

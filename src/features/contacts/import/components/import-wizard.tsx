@@ -82,23 +82,55 @@ export function ImportWizard({ owners, brands, currentUserId }: ImportWizardProp
 
   const [summary, setSummary] = useState<ImportSummary | null>(null);
 
-  function readFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = String(reader.result ?? "");
-      const rows = parseCsv(text);
+  /** Shared by both formats: everything from mapping onwards is identical. */
+  function acceptCsvText(text: string) {
+    const rows = parseCsv(text);
 
-      if (rows.length < 2) {
-        toast.error("That file has a header but no rows.");
-        return;
+    if (rows.length < 2) {
+      toast.error("That file has a header but no rows.");
+      return;
+    }
+
+    setCsv(text);
+    setHeaders(rows[0]);
+    setPreview(rows.slice(1, 6));
+    setMapping(guessMapping(rows[0]));
+    setStep("map");
+  }
+
+  async function readFile(file: File) {
+    // A spreadsheet is converted on the server, which keeps a parser for the
+    // ZIP-of-XML that is .xlsx out of everyone's browser. From the CSV back
+    // onwards the two formats are the same path.
+    if (/\.xlsx?$/i.test(file.name)) {
+      setBusy(true);
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const res = await fetch("/api/contacts/xlsx", { method: "POST", body });
+        const payload = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          toast.error(payload.error ?? "That spreadsheet could not be read.");
+          return;
+        }
+
+        toast.success(
+          payload.sheetName
+            ? `Read ${payload.rowCount - 1} rows from “${payload.sheetName}”.`
+            : `Read ${payload.rowCount - 1} rows.`,
+        );
+        acceptCsvText(payload.csv);
+      } catch {
+        toast.error("That spreadsheet could not be read.");
+      } finally {
+        setBusy(false);
       }
+      return;
+    }
 
-      setCsv(text);
-      setHeaders(rows[0]);
-      setPreview(rows.slice(1, 6));
-      setMapping(guessMapping(rows[0]));
-      setStep("map");
-    };
+    const reader = new FileReader();
+    reader.onload = () => acceptCsvText(String(reader.result ?? ""));
     reader.onerror = () => toast.error("That file could not be read.");
     reader.readAsText(file);
   }
@@ -153,23 +185,23 @@ export function ImportWizard({ owners, brands, currentUserId }: ImportWizardProp
             onDrop={(event) => {
               event.preventDefault();
               const file = event.dataTransfer.files?.[0];
-              if (file) readFile(file);
+              if (file) void readFile(file);
             }}
             className="rounded-lg border border-dashed p-10 text-center"
           >
             <input
               ref={inputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0];
-                if (file) readFile(file);
+                if (file) void readFile(file);
               }}
             />
             <FileUp className="mx-auto mb-3 size-6 text-muted-foreground" />
             <p className="text-sm">
-              Drop a CSV here, or{" "}
+              Drop a CSV or Excel file here, or{" "}
               <button
                 type="button"
                 className="font-medium underline underline-offset-4"

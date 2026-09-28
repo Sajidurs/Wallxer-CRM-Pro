@@ -30,7 +30,9 @@ function toRow(values: TaskValues) {
     contact_id: values.contactId,
     start_at: values.startAt,
     due_at: values.dueAt,
-    estimated_minutes: values.estimatedMinutes,
+    // Hours in the form, minutes in the column — converted here, once.
+    estimated_minutes:
+      values.estimatedHours === null ? null : Math.round(values.estimatedHours * 60),
   };
 }
 
