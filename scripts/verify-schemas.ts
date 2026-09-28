@@ -30,6 +30,11 @@ import {
   updateContactSchema,
 } from "../src/features/contacts/schema";
 import {
+  renewalSchema,
+  updateRenewalSchema,
+  renewalFiltersSchema,
+} from "../src/features/renewals/schema";
+import {
   createCredentialSchema,
   updateCredentialSchema,
 } from "../src/features/credentials/schema";
@@ -391,6 +396,72 @@ const cases: Case[] = [
     name: "invoiceFiltersSchema",
     schema: invoiceFiltersSchema,
     input: { q: "WLX", status: "paid" },
+  },
+  {
+    // Price, cost and the reminder all arrive as typed strings and leave as
+    // numbers, which is the shape a second parse tends to reject.
+    name: "renewalSchema (full)",
+    schema: renewalSchema,
+    input: {
+      name: "  Elementor Pro  ",
+      category: "tool",
+      vendor: " Elementor ",
+      contactId: UUID,
+      projectId: null,
+      brandId: null,
+      status: "active",
+      cycle: "yearly",
+      startedOn: "2025-01-15",
+      nextRenewalOn: "2026-01-15",
+      lastRenewedOn: "2025-01-15",
+      currency: "USD",
+      price: "1,200.50",
+      cost: "59.00",
+      autoRenew: true,
+      reminderDays: "30",
+      loginUrl: "https://my.elementor.com",
+      notes: "",
+    },
+  },
+  {
+    name: "renewalSchema (no money recorded)",
+    schema: renewalSchema,
+    input: {
+      name: "wallxer.com",
+      category: "domain",
+      status: "active",
+      cycle: "biennial",
+      startedOn: "2024-03-01",
+      nextRenewalOn: "2026-03-01",
+      currency: "BDT",
+      price: "",
+      cost: "",
+      autoRenew: false,
+      reminderDays: "14",
+    },
+  },
+  {
+    name: "updateRenewalSchema",
+    schema: updateRenewalSchema,
+    input: {
+      id: UUID,
+      values: {
+        name: "Hosting",
+        category: "hosting",
+        status: "lapsed",
+        cycle: "monthly",
+        startedOn: "2026-01-01",
+        nextRenewalOn: "2026-02-01",
+        currency: "EUR",
+        autoRenew: true,
+        reminderDays: 7,
+      },
+    },
+  },
+  {
+    name: "renewalFiltersSchema",
+    schema: renewalFiltersSchema,
+    input: { q: "elementor", due: "overdue" },
   },
   {
     // These were never covered, and now carry a superRefine on top of the

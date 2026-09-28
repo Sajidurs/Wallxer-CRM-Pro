@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { countRenewalsNeedingAttention } from "@/features/renewals/queries";
 import { signAvatar } from "@/features/users/avatars";
 import { PageTransition } from "@/components/layout/page-transition";
 import { Topbar } from "@/components/layout/topbar";
@@ -18,7 +19,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   // Counts for the sidebar. Head-only requests, so the database returns a
   // number and no rows, and all four go at once.
-  const [workspace, contacts, projects, tasks, deals] = await Promise.all([
+  const [workspace, contacts, projects, tasks, deals, renewals] = await Promise.all([
     supabase
       .from("workspaces")
       .select("name")
@@ -42,6 +43,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       .select("id", { count: "exact", head: true })
       .is("deleted_at", null)
       .eq("status", "open"),
+    // Not a total: the badge means "needs attention", so it counts only what is
+    // overdue or falls due inside thirty days. The date arithmetic lives in the
+    // renewals module, where it is not sitting in a component body.
+    countRenewalsNeedingAttention(),
   ]);
 
   return (
@@ -58,6 +63,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           projects: projects.count ?? 0,
           tasks: tasks.count ?? 0,
           deals: deals.count ?? 0,
+          renewals,
         }}
       />
       <SidebarInset>

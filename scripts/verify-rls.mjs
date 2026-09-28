@@ -1628,6 +1628,80 @@ if (!serviceKey) {
       String(computed.subtotal_minor),
     );
 
+    // --- renewals (0025) ----------------------------------------------------
+    // Workspace-wide like projects: members add and edit, managers delete. The
+    // interesting part is the date arithmetic, which lives in the database.
+
+    const { data: probeRenewal } = await admin
+      .from("renewals")
+      .insert({
+        workspace_id: workspaceId,
+        name: "__rls_probe_renewal__",
+        category: "hosting",
+        cycle: "monthly",
+        started_on: "2025-01-31",
+        next_renewal_on: "2026-01-31",
+      })
+      .select("id")
+      .single();
+
+    const anonRenewals = await anon.from("renewals").select("*");
+    check(
+      "anon reads no renewals",
+      (anonRenewals.data?.length ?? 0) === 0,
+      anonRenewals.error ? anonRenewals.error.message : `rows: ${anonRenewals.data?.length}`,
+    );
+
+    const memberReadsRenewals = await member.from("renewals").select("id");
+    check(
+      "member can read renewals",
+      (memberReadsRenewals.data?.length ?? 0) >= 1,
+      memberReadsRenewals.error?.message ?? `rows: ${memberReadsRenewals.data?.length}`,
+    );
+
+    const memberEditsRenewal = await member
+      .from("renewals")
+      .update({ vendor: "__rls_probe_vendor__" })
+      .eq("id", probeRenewal.id)
+      .select("id");
+    check(
+      "member can edit a renewal",
+      (memberEditsRenewal.data?.length ?? 0) === 1,
+      memberEditsRenewal.error?.message ?? `rows: ${memberEditsRenewal.data?.length}`,
+    );
+
+    const memberDeletesRenewal = await member
+      .from("renewals")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", probeRenewal.id);
+    check(
+      "member cannot delete a renewal",
+      !!memberDeletesRenewal.error,
+      memberDeletesRenewal.error?.message ?? "NO ERROR — members can delete renewals",
+    );
+
+    // 31 January plus a month is 28 February, which is the answer a billing
+    // cycle uses and the one JavaScript does not give.
+    const advanced = await member.rpc("advance_renewal", { p_id: probeRenewal.id });
+    check(
+      "advance_renewal does month-end arithmetic correctly",
+      advanced.data === "2026-02-28",
+      advanced.error?.message ?? String(advanced.data),
+    );
+
+    const hardDeleteRenewal = await user
+      .from("renewals")
+      .delete()
+      .eq("id", probeRenewal.id)
+      .select("id");
+    check(
+      "a renewal cannot be hard deleted",
+      (hardDeleteRenewal.data?.length ?? 0) === 0,
+      hardDeleteRenewal.error?.message ?? `rows deleted: ${hardDeleteRenewal.data?.length}`,
+    );
+
+    await admin.from("renewals").delete().eq("id", probeRenewal.id);
+
     await admin.from("invoice_items").delete().eq("invoice_id", probeInvoice.id);
     await admin.from("invoices").delete().eq("id", probeInvoice.id);
     await admin.from("brands").update({ invoice_counter: 0 }).eq("id", anyBrand.id);

@@ -1,5 +1,6 @@
 import {
   Building2,
+  CalendarClock,
   CheckSquare,
   FileText,
   FolderKanban,
@@ -32,7 +33,7 @@ export interface NavItem {
    * Live count shown on the right of the row, Notion-style. Resolved by the
    * layout, which already reads most of these for other reasons.
    */
-  countKey?: "contacts" | "projects" | "tasks" | "deals";
+  countKey?: "contacts" | "projects" | "tasks" | "deals" | "renewals";
   /**
    * A per-user grant rather than a role, checked with its own helper. Finance
    * is the only one: `resource` cannot express it, because roles are
@@ -84,6 +85,13 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: CheckSquare,
         resource: "task",
         countKey: "tasks",
+      },
+      {
+        title: "Renewals",
+        href: "/renewals",
+        icon: CalendarClock,
+        resource: "project",
+        countKey: "renewals",
       },
       {
         title: "Invoices",

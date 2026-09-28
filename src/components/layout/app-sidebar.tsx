@@ -26,6 +26,8 @@ export interface NavCounts {
   projects?: number;
   tasks?: number;
   deals?: number;
+  /** Only what needs attention: overdue or due within thirty days. */
+  renewals?: number;
 }
 
 interface AppSidebarProps {

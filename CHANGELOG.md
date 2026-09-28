@@ -102,6 +102,7 @@ Update this file at the end of every work session, before you stop.
 | `0022_avatar_cleanup.sql` | Yes, 2026-09-26                |
 | `0023_invoices.sql`    | Yes, 2026-09-27                   |
 | `0024_credential_vault_links.sql` | Yes, 2026-09-28       |
+| `0025_renewals.sql`    | Yes, 2026-09-28                   |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -162,6 +163,61 @@ can be commented on, and one search box finds anything.
 ---
 
 ## Unreleased
+
+### 2026-09-28 — Renewals
+
+**Added**
+
+A tab for the recurring things sold to clients — hosting, domains, tool licences like Elementor Pro
+and WP Rocket — with who took each one, when it started, when it last renewed, when it next falls
+due, and what is already overdue.
+
+- **`/renewals`**, ordered by what is due next, with filters for overdue, the next 30 days and the
+  next 90, and by category.
+- **A "Mark renewed" action** that rolls the cycle forward by one period and records the date that
+  was due as the last renewal.
+- **A count in the sidebar** of what is overdue or falls due inside thirty days — not a total,
+  because a badge showing "31" when nothing needs doing teaches people to ignore it.
+- Monthly, quarterly, half-yearly, yearly and biennial cycles; price to the client and cost to you,
+  both optional; auto-renew or manual; a login URL and notes.
+
+**Notes:**
+
+- **Named for the question, not the noun.** The record is a subscription, but nobody opens this
+  screen to browse subscriptions — they open it because something is about to lapse. The table is
+  `renewals` too: one name throughout beats a `renewals` tab reading a `subscriptions` table.
+- **`overdue` is not a column.** It is `next_renewal_on < today`, and a stored copy would be wrong
+  every morning until something happened to write to the row.
+- **The date arithmetic is a database function.** Adding a month to 31 January gives 3 March in
+  JavaScript and 28 February in Postgres, and the second is what a billing cycle actually does. Both
+  that and 29 February plus a year are asserted in `verify:rls`, because this is the kind of bug
+  that surfaces once a year on someone else's renewal date.
+- **Renewing rolls forward from the date that was due, not from today**, so a renewal paid three
+  days late keeps its anniversary instead of drifting later every year.
+- Renewing something marked lapsed brings it back to active, because that is what paying an overdue
+  invoice means.
+- **Workspace-wide, like projects, not behind the Finance grant.** The person who notices a domain
+  is about to expire is not always the person who holds finance access. Deleting stays with
+  managers, as it does for every record the business is made of. The price and cost fields are
+  visible to members as a consequence — say so if that should change, it is one predicate.
+- The annual figure normalises every cycle to a year so a monthly line and a biennial one can be
+  compared, and it is reported per currency rather than summed across them.
+- **6 new RLS checks and 4 new schema checks.** 43/43 idempotent, 115/122 RLS — the seven being the
+  long-standing self-demotion artifact in the suite.
+- Verified end to end against the production build: the month-end arithmetic, the late-renewal
+  anniversary, the lapsed-to-active revival, the constraint that refuses a renewal dated before its
+  own start, the overdue and 30-day filters narrowing correctly, and a member able to edit but not
+  delete. 19 of 19.
+- The nav count query moved into the renewals module after the linter refused `Date.now()` in a
+  component body — React Compiler treats it as impure, and it was right to: that arithmetic belongs
+  with the query, not in the layout.
+
+**Files touched:** `supabase/migrations/0025_renewals.sql`, `src/features/renewals/**`,
+`src/app/(app)/renewals/**`, `src/app/(app)/layout.tsx`,
+`src/components/layout/{nav-config,app-sidebar}.tsx`, `scripts/{verify-rls.mjs,verify-schemas.ts}`
+
+**Migration:** 0025_renewals.sql — applied
+
 
 ### 2026-09-28 — Excel import, contact export, and estimates in hours
 

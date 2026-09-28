@@ -1214,6 +1214,130 @@ export type Database = {
           },
         ]
       }
+      renewals: {
+        Row: {
+          auto_renew: boolean
+          brand_id: string | null
+          category: Database["public"]["Enums"]["renewal_category"]
+          contact_id: string | null
+          cost_minor: number | null
+          created_at: string
+          created_by: string | null
+          currency: Database["public"]["Enums"]["invoice_currency"]
+          cycle: Database["public"]["Enums"]["renewal_cycle"]
+          deleted_at: string | null
+          id: string
+          last_renewed_on: string | null
+          login_url: string | null
+          name: string
+          next_renewal_on: string
+          notes: string | null
+          price_minor: number | null
+          project_id: string | null
+          reminder_days: number
+          started_on: string
+          status: Database["public"]["Enums"]["renewal_status"]
+          updated_at: string
+          vendor: string | null
+          workspace_id: string
+        }
+        Insert: {
+          auto_renew?: boolean
+          brand_id?: string | null
+          category?: Database["public"]["Enums"]["renewal_category"]
+          contact_id?: string | null
+          cost_minor?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["invoice_currency"]
+          cycle?: Database["public"]["Enums"]["renewal_cycle"]
+          deleted_at?: string | null
+          id?: string
+          last_renewed_on?: string | null
+          login_url?: string | null
+          name: string
+          next_renewal_on: string
+          notes?: string | null
+          price_minor?: number | null
+          project_id?: string | null
+          reminder_days?: number
+          started_on?: string
+          status?: Database["public"]["Enums"]["renewal_status"]
+          updated_at?: string
+          vendor?: string | null
+          workspace_id: string
+        }
+        Update: {
+          auto_renew?: boolean
+          brand_id?: string | null
+          category?: Database["public"]["Enums"]["renewal_category"]
+          contact_id?: string | null
+          cost_minor?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["invoice_currency"]
+          cycle?: Database["public"]["Enums"]["renewal_cycle"]
+          deleted_at?: string | null
+          id?: string
+          last_renewed_on?: string | null
+          login_url?: string | null
+          name?: string
+          next_renewal_on?: string
+          notes?: string | null
+          price_minor?: number | null
+          project_id?: string | null
+          reminder_days?: number
+          started_on?: string
+          status?: Database["public"]["Enums"]["renewal_status"]
+          updated_at?: string
+          vendor?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewals_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_projects_at_risk"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renewals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resource_links: {
         Row: {
           created_at: string
@@ -1848,6 +1972,7 @@ export type Database = {
       }
     }
     Functions: {
+      advance_renewal: { Args: { p_id: string }; Returns: string }
       auth_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -1958,6 +2083,21 @@ export type Database = {
         | "on_hold"
         | "completed"
         | "cancelled"
+      renewal_category:
+        | "hosting"
+        | "domain"
+        | "tool"
+        | "ssl"
+        | "email"
+        | "maintenance"
+        | "other"
+      renewal_cycle:
+        | "monthly"
+        | "quarterly"
+        | "half_yearly"
+        | "yearly"
+        | "biennial"
+      renewal_status: "active" | "cancelled" | "lapsed"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "todo" | "in_progress" | "review" | "blocked" | "done"
       transaction_kind: "income" | "expense"
@@ -2125,6 +2265,23 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      renewal_category: [
+        "hosting",
+        "domain",
+        "tool",
+        "ssl",
+        "email",
+        "maintenance",
+        "other",
+      ],
+      renewal_cycle: [
+        "monthly",
+        "quarterly",
+        "half_yearly",
+        "yearly",
+        "biennial",
+      ],
+      renewal_status: ["active", "cancelled", "lapsed"],
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["todo", "in_progress", "review", "blocked", "done"],
       transaction_kind: ["income", "expense"],
