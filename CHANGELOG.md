@@ -164,6 +164,46 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-30 — The application does not print
+
+**Fixed**
+
+A printed invoice carried the app's chrome across the top: the sidebar toggle, the "Invoices"
+breadcrumb, and the signed-in user's photo and name. The invoice's own action bar already had
+`print:hidden`; the shell around it never did.
+
+- **The topbar is hidden when printing.** Done in the component rather than on the invoice page,
+  because a breadcrumb and an account menu have no business on paper whichever page produced them.
+- **The sidebar too**, targeted by `data-slot` in CSS: the primitive renders through three branches —
+  a plain column, a mobile sheet, and the desktop group — and the mobile one is a Radix portal on the
+  body, outside any wrapper a class could reach.
+- **The content area drops its reading-width cap and padding on paper**, so a printed invoice uses
+  the page instead of sitting in a narrow column with a wide margin. It now starts at the page edge.
+- Floating overlays — toasts, dialog and sheet backdrops, popovers — are hidden rather than
+  un-pinned. Making a fixed overlay `static` would drop an open toast into the middle of the printed
+  document instead of removing it.
+
+**Notes:**
+
+- Verified by emulating print media in a real browser and asking what actually occupies space, which
+  is the only way to check a print stylesheet: the topbar, sidebar, action buttons, breadcrumb, user
+  name and status chip all disappear, while the INVOICE heading, number, letterhead, address, line
+  items, total and bank block all survive. 17 of 17, and the same check confirms the chrome is still
+  there on screen.
+
+**Incident:** the test for this wrote a placeholder bank block onto the live Wallxer company record,
+overwriting whatever was there. It was cleared as soon as it was noticed — a fictional account number
+on an invoice is worse than a blank one — and no invoice had frozen it into a snapshot, so nothing
+sent carries it. The bank details on that company now need re-entering. The lesson is narrow and
+sharp: a test that needs a record in a particular state must create its own, not edit the one the
+business uses.
+
+**Files touched:** `src/components/layout/topbar.tsx`, `src/app/(app)/layout.tsx`,
+`src/app/globals.css`
+
+**Migration:** none
+
+
 ### 2026-09-28 — Renewals
 
 **Added**

@@ -76,7 +76,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         {/* A single readable column rather than full width. Notion's content
             area is generous but bounded; text running the width of a 27in
             monitor is not calm, it is just wide. */}
-        <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-6 py-8">
+        {/* On paper the content is the whole page: no reading-width cap and no
+            screen padding, so a printed invoice is not a narrow column with a
+            wide margin. */}
+        <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-6 py-8 print:max-w-none print:p-0">
           <PageTransition>{children}</PageTransition>
         </main>
       </SidebarInset>

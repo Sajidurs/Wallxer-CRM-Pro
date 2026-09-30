@@ -246,3 +246,41 @@
   --series-positive: #3987e5;
   --series-negative: #e66767;
 }
+
+/* ---------------------------------------------------------------------------
+   Printing
+   ---------------------------------------------------------------------------
+   What reaches paper is the document, not the application around it.
+
+   The sidebar is targeted by data attribute rather than by class because the
+   primitive renders through three different branches — a plain column, a mobile
+   sheet, and the desktop group — and a className would have to be threaded
+   through all three. One rule covers every path.
+
+   The topbar and the invoice's own action bar carry `print:hidden` instead,
+   because those are this codebase's own components and the class says so where
+   someone reading the component will see it. */
+@media print {
+  /* The desktop sidebar sits inside the wrapper; the mobile one is a Radix
+     portal attached to the body, so it needs naming separately. */
+  [data-slot="sidebar-wrapper"] > :not([data-slot="sidebar-inset"]),
+  [data-slot="sidebar"] {
+    display: none !important;
+  }
+
+  [data-slot="sidebar-inset"] {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Anything floating over the page belongs to the screen. Hidden rather than
+     un-pinned: making a fixed overlay static would drop an open toast or dialog
+     into the middle of the printed document instead of removing it. */
+  [data-sonner-toaster],
+  [data-slot="dialog-overlay"],
+  [data-slot="sheet-overlay"],
+  [data-radix-popper-content-wrapper] {
+    display: none !important;
+  }
+}

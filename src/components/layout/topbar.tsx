@@ -17,7 +17,9 @@ interface TopbarProps {
  */
 export function Topbar({ fullName, email, role, avatarUrl }: TopbarProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 bg-background/80 px-4 backdrop-blur-sm">
+    // Not part of any document: a breadcrumb and an account menu have no
+    // business on paper, whichever page was printed.
+    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 bg-background/80 px-4 backdrop-blur-sm print:hidden">
       <SidebarTrigger className="-ml-1 size-7 text-muted-foreground" />
       <Breadcrumb />
 
