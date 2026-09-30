@@ -164,6 +164,44 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-09-30 — Hydration warning from a browser extension
+
+**Fixed**
+
+`<body>` now carries `suppressHydrationWarning`, alongside the `<html>` that already had it.
+
+The reported error was React finding `contenteditable="false"` on `<body>` in the server HTML and not
+in its own render. Nothing in this codebase sets that attribute, and neither does any dependency —
+both were grepped. It comes from a browser extension: Grammarly and similar write `contenteditable`
+and `data-*` attributes onto the body before the React bundle loads, so React reads them as part of
+the server HTML and reports a mismatch it can neither explain nor fix. Next's own error text lists
+this as a cause.
+
+**Notes:**
+
+- **This is a development-only symptom.** Production React does not emit the verbose hydration
+  warning, which is why the deployed build showed nothing under the same conditions. Nothing was
+  broken for anyone using the app; the console was noisy for whoever had the extension installed.
+- **The suppression is scoped, not a blanket silence.** React reads `suppressHydrationWarning` from
+  the props of the element it is checking, so it covers `body`'s own attributes and text and nothing
+  else — confirmed by reading the reconciler rather than trusting the documentation: the flag is
+  consulted as `props.suppressHydrationWarning` at each element, and a child's props do not inherit
+  it. A genuine mismatch inside a page still reports.
+- **Honestly: the original error was not reproduced locally.** A simulated extension — a script
+  injected at document start that stamps the attribute onto `<body>` the instant it exists — did not
+  make React complain, on either a development or a production build. Real extensions do more than
+  set one attribute, and the timing is theirs, not mine. So the fix rests on the diagnosis being
+  sound (the attribute is provably not ours) and on the remedy being the documented one, not on a
+  reproduction. If the warning returns, that is the thing to say.
+- Two of the attempts to reproduce it were invalid for a duller reason: a leftover `next dev` was
+  holding port 3000, and Next 16 refuses to start a second development server for the same
+  directory, so those runs were measuring a page that never loaded.
+
+**Files touched:** `src/app/layout.tsx`
+
+**Migration:** none
+
+
 ### 2026-09-30 — The application does not print
 
 **Fixed**

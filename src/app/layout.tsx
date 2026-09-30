@@ -37,7 +37,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${manrope.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full">
+      {/*
+        Suppressed for the same reason as `html` above, but a different culprit.
+        `html` is written to by next-themes before React runs; `body` is written
+        to by browser extensions — Grammarly and the like add `contenteditable`
+        and `data-*` attributes to it, and React sees them as server HTML that
+        its own render disagrees with.
+
+        This is safe rather than a blanket silence: `suppressHydrationWarning`
+        only applies one level deep, so it covers this element's own attributes
+        and nothing inside the app. A genuine mismatch in a page still reports.
+      */}
+      <body className="min-h-full" suppressHydrationWarning>
         <Providers>{children}</Providers>
         <Toaster richColors position="top-right" />
       </body>
