@@ -164,6 +164,71 @@ can be commented on, and one search box finds anything.
 
 ## Unreleased
 
+### 2026-10-26 — Proposals, and Commerce Waver
+
+**Added**
+
+- **Commerce Waver**, a fifth company. Inserted read-first: the script printed the existing brands,
+  confirmed no case-insensitive name collision, picked an unused colour (`#db2777`) and inserted at
+  `position = max + 1`. Boost, Falah Chat, Aim Locksmith and Wallxer were re-read afterwards and are
+  untouched. The script was then deleted.
+- **Proposals** — pick a client, write what you are offering, send them the PDF. A new module at
+  `/proposals`, modelled closely on Invoices because it is the same document at an earlier moment:
+  the same letterhead, the same client, the same priced lines. An accepted proposal therefore
+  already holds everything an invoice needs.
+
+**The shape of it**
+
+- **Fixed sections, not a text box.** Overview, Scope of work, Deliverables, Timeline, Investment and
+  Terms. Every one optional — a blank section is not printed, so the structure is a prompt rather
+  than an obligation, and a one-paragraph proposal still reads properly. The order lives once, in
+  `PROPOSAL_SECTIONS`, and drives the form and the document alike.
+- **Optional priced lines**, the same shape as invoice lines and with the same generated
+  `amount_minor` column, so a line total can never disagree with the figures beside it. With no
+  lines the pricing table is left off the document entirely — a retainer conversation does not have
+  to invent a price to use this.
+- **Its own numbering**, `WLX-P0001`, from a `proposal_counter` separate from `invoice_counter`.
+  Sharing the counter would mean a sent proposal burning an invoice number and leaving a gap in the
+  books. The `P` also keeps the two apart at a glance in a client's inbox.
+- **Draft → sent → accepted/declined**, with the letterhead and client details frozen onto it the
+  first time it leaves draft, and a draft refusing to be edited once sent. A proposal is the one
+  document that gets argued over later; the copy the client holds and the copy here must not drift.
+- **Sending is a `mailto:` link**, not a mail server. It opens the user's own mail client addressed
+  to the contact with a subject and opening line filled in; they attach the PDF they just saved. It
+  goes from their real address, lands in their Sent folder and threads when the client replies —
+  all of which a server sending on their behalf would have to work to imitate. SMTP stays deferred.
+
+**Permissions** — workspace-wide, like Projects and Renewals, **not** behind the Finance grant that
+Invoices sit behind. Writing a proposal is sales work, and the person who would run the project is
+usually the one who should be able to draft it; it carries no bank details of its own and touches no
+ledger. Deleting stays with managers, enforced by `guard_proposal_edit` exactly as Renewals does.
+Flagging this because it is a deliberate divergence from Invoices and is one predicate in four
+places to reverse if it should have been the other way.
+
+**Files touched:** `supabase/migrations/0026_proposals.sql`, `src/features/proposals/schema.ts`,
+`src/features/proposals/queries.ts`, `src/features/proposals/actions.ts`,
+`src/features/proposals/components/{proposal-form,proposal-document,proposal-actions}.tsx`,
+`src/app/(app)/proposals/{page.tsx,new/page.tsx,[id]/page.tsx,[id]/edit/page.tsx}`,
+`src/components/layout/nav-config.ts`
+
+**Migration:** `supabase/migrations/0026_proposals.sql` — purely additive. One enum
+(`proposal_status`), one column (`brands.proposal_counter`, defaulted, so no existing row is
+rewritten), two new tables. Nothing existing is altered or dropped.
+
+**Notes:**
+
+- The migration carries the three lessons this schema has already paid for: the SELECT policy does
+  not filter `deleted_at` (0009/0021 — an UPDATE's resulting row must still satisfy SELECT, or the
+  soft delete that creates it is rejected); `sync_proposal_subtotal` branches on `tg_op` before
+  touching any record field (0016); and both reused helpers were read at their newest definition
+  rather than assumed (0019/0020).
+- `next_proposal_number` falls back to the first three letters of the company name when
+  `invoice_prefix` is unset. The five current companies derive BOO, FAL, AIM, WAL and COM — all
+  distinct — but two unprefixed companies that began with the same three letters would collide on
+  `proposals_number_key` after the counter had already advanced. Invoices have had exactly this
+  exposure since 0023; this inherits it rather than diverging. Setting an explicit prefix on each
+  company removes it.
+
 ### 2026-09-30 — Hydration warning from a browser extension
 
 **Fixed**

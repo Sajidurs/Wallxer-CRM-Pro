@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   graphql_public: {
     Tables: {
@@ -163,6 +163,7 @@ export type Database = {
           name: string
           phone: string | null
           position: number
+          proposal_counter: number
           tax_id: string | null
           updated_at: string
           website: string | null
@@ -183,6 +184,7 @@ export type Database = {
           name: string
           phone?: string | null
           position?: number
+          proposal_counter?: number
           tax_id?: string | null
           updated_at?: string
           website?: string | null
@@ -203,6 +205,7 @@ export type Database = {
           name?: string
           phone?: string | null
           position?: number
+          proposal_counter?: number
           tax_id?: string | null
           updated_at?: string
           website?: string | null
@@ -1214,6 +1217,202 @@ export type Database = {
           },
         ]
       }
+      proposal_items: {
+        Row: {
+          amount_minor: number | null
+          created_at: string
+          description: string
+          id: string
+          position: number
+          proposal_id: string
+          quantity: number
+          unit_amount_minor: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_minor?: number | null
+          created_at?: string
+          description: string
+          id?: string
+          position?: number
+          proposal_id: string
+          quantity?: number
+          unit_amount_minor?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount_minor?: number | null
+          created_at?: string
+          description?: string
+          id?: string
+          position?: number
+          proposal_id?: string
+          quantity?: number
+          unit_amount_minor?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposals: {
+        Row: {
+          brand_id: string
+          client_snapshot: Json | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: Database["public"]["Enums"]["invoice_currency"]
+          decided_at: string | null
+          deleted_at: string | null
+          deliverables: string | null
+          id: string
+          investment: string | null
+          issue_date: string
+          issuer_snapshot: Json | null
+          number: string
+          overview: string | null
+          project_id: string | null
+          scope: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["proposal_status"]
+          subtotal_minor: number
+          tax_label: string | null
+          tax_minor: number
+          tax_rate: number
+          terms: string | null
+          timeline: string | null
+          title: string
+          total_minor: number
+          updated_at: string
+          valid_until: string | null
+          workspace_id: string
+        }
+        Insert: {
+          brand_id: string
+          client_snapshot?: Json | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["invoice_currency"]
+          decided_at?: string | null
+          deleted_at?: string | null
+          deliverables?: string | null
+          id?: string
+          investment?: string | null
+          issue_date?: string
+          issuer_snapshot?: Json | null
+          number: string
+          overview?: string | null
+          project_id?: string | null
+          scope?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["proposal_status"]
+          subtotal_minor?: number
+          tax_label?: string | null
+          tax_minor?: number
+          tax_rate?: number
+          terms?: string | null
+          timeline?: string | null
+          title: string
+          total_minor?: number
+          updated_at?: string
+          valid_until?: string | null
+          workspace_id: string
+        }
+        Update: {
+          brand_id?: string
+          client_snapshot?: Json | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["invoice_currency"]
+          decided_at?: string | null
+          deleted_at?: string | null
+          deliverables?: string | null
+          id?: string
+          investment?: string | null
+          issue_date?: string
+          issuer_snapshot?: Json | null
+          number?: string
+          overview?: string | null
+          project_id?: string | null
+          scope?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["proposal_status"]
+          subtotal_minor?: number
+          tax_label?: string | null
+          tax_minor?: number
+          tax_rate?: number
+          terms?: string | null
+          timeline?: string | null
+          title?: string
+          total_minor?: number
+          updated_at?: string
+          valid_until?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_projects_at_risk"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       renewals: {
         Row: {
           auto_renew: boolean
@@ -2029,6 +2228,7 @@ export type Database = {
       is_manager: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       next_invoice_number: { Args: { p_brand_id: string }; Returns: string }
+      next_proposal_number: { Args: { p_brand_id: string }; Returns: string }
       reveal_credential: {
         Args: { p_credential_id: string }
         Returns: {
@@ -2083,6 +2283,7 @@ export type Database = {
         | "on_hold"
         | "completed"
         | "cancelled"
+      proposal_status: "draft" | "sent" | "accepted" | "declined"
       renewal_category:
         | "hosting"
         | "domain"
@@ -2265,6 +2466,7 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      proposal_status: ["draft", "sent", "accepted", "declined"],
       renewal_category: [
         "hosting",
         "domain",

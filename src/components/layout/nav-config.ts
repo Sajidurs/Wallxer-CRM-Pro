@@ -2,6 +2,7 @@ import {
   Building2,
   CalendarClock,
   CheckSquare,
+  FileSignature,
   FileText,
   FolderKanban,
   KanbanSquare,
@@ -71,6 +72,14 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: KanbanSquare,
         resource: "deal",
         countKey: "deals",
+      },
+      {
+        title: "Proposals",
+        href: "/proposals",
+        icon: FileSignature,
+        // Written by whoever would run the work, so it rides on the project
+        // permission rather than the Finance grant that invoices sit behind.
+        resource: "project",
       },
       {
         title: "Projects",
