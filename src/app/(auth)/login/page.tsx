@@ -26,9 +26,9 @@ export default function LoginPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {/* LoginForm reads `next` from the query string, so it needs a
-            Suspense boundary to avoid opting the whole page out of static
-            rendering. */}
+        {/* LoginForm reads `next` from the query string. The boundary lets the
+            card render while that client hook resolves. The route is dynamic
+            (see the auth layout) so this is not here to keep the page static. */}
         <Suspense fallback={<Skeleton className="h-56 w-full" />}>
           <LoginForm />
         </Suspense>
