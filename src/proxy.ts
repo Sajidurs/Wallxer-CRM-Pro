@@ -24,6 +24,19 @@ import { publicEnv } from "@/lib/env";
  */
 const PUBLIC_PATHS = ["/login", "/set-password", "/auth", "/api/health"];
 
+/**
+ * Auth redirects and every page this proxy forwards are session-dependent.
+ * `private, no-store` is what tells the CDN not to keep the response. Static
+ * assets never reach here: the matcher below skips `_next/static` and files.
+ */
+const PRIVATE_NO_STORE =
+  "private, no-cache, no-store, max-age=0, must-revalidate";
+
+function privateNoStore(response: NextResponse) {
+  response.headers.set("Cache-Control", PRIVATE_NO_STORE);
+  return response;
+}
+
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
@@ -73,17 +86,17 @@ export async function proxy(request: NextRequest) {
     if (pathname !== "/") {
       loginUrl.searchParams.set("next", pathname);
     }
-    return NextResponse.redirect(loginUrl);
+    return privateNoStore(NextResponse.redirect(loginUrl));
   }
 
   if (user && (pathname === "/login" || pathname === "/")) {
     const dashboardUrl = request.nextUrl.clone();
     dashboardUrl.pathname = "/dashboard";
     dashboardUrl.search = "";
-    return NextResponse.redirect(dashboardUrl);
+    return privateNoStore(NextResponse.redirect(dashboardUrl));
   }
 
-  return response;
+  return privateNoStore(response);
 }
 
 export const config = {

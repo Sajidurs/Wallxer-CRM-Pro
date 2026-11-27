@@ -11,7 +11,14 @@ import { createClient } from "@/lib/supabase/server";
  * Every authenticated page renders inside this. `requireUser` runs on each
  * request, so a session that is revoked or suspended mid-visit is caught on the
  * next navigation rather than lingering until the cookie expires.
+ *
+ * `force-dynamic` keeps that per-request render from ever being prerendered.
+ * `requireUser()` already reads cookies, which opts the tree out of static
+ * rendering; the segment config is what stops a later edit from putting a
+ * year-long CDN cache in front of a signed-in page.
  */
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const profile = await requireUser();
 
