@@ -8,6 +8,7 @@ import {
   KanbanSquare,
   LayoutDashboard,
   GitBranch,
+  KeyRound,
   Wallet,
   Users,
   UsersRound,
@@ -127,6 +128,12 @@ export const NAV_SECTIONS: NavSection[] = [
         title: "Users",
         href: "/settings/users",
         icon: UsersRound,
+        resource: "user",
+      },
+      {
+        title: "API keys",
+        href: "/settings/bots",
+        icon: KeyRound,
         resource: "user",
       },
       {

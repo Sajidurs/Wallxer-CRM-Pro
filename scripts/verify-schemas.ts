@@ -23,6 +23,7 @@
 import type { ZodType } from "zod";
 
 import { loginSchema, setPasswordSchema } from "../src/features/auth/schema";
+import { createBotKeySchema, revokeBotKeySchema } from "../src/features/bots/schema";
 import {
   contactFiltersSchema,
   contactSchema,
@@ -87,6 +88,16 @@ interface Case {
 const UUID = "00000000-0000-0000-0000-000000000000";
 
 const cases: Case[] = [
+  {
+    name: "createBotKeySchema",
+    schema: createBotKeySchema,
+    input: { name: "  Grok Bot  ", profileId: UUID, scopes: ["read", "write"] },
+  },
+  {
+    name: "revokeBotKeySchema",
+    schema: revokeBotKeySchema,
+    input: { id: UUID },
+  },
   {
     name: "loginSchema",
     schema: loginSchema,

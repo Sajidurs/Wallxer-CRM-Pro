@@ -14,10 +14,12 @@
     "bootstrap:admin": "node --env-file=.env.local scripts/bootstrap-admin.mjs",
     "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs",
     "verify:schemas": "tsx scripts/verify-schemas.ts",
+    "test": "node --import tsx --test src/features/mcp/auth.test.ts",
     "backup": "node --env-file=.env.local scripts/backup.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
+    "@modelcontextprotocol/server": "^2.4.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.1",
     "@tanstack/react-query": "^5.103.2",
@@ -26,6 +28,7 @@
     "cn": "^0.4.0",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.47.0",
+    "mcp-handler": "^2.4.0",
     "next": "16.3.6",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.6.7",

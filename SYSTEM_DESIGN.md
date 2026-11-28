@@ -767,6 +767,22 @@ No public URLs anywhere.
 Storage RLS policies mirror the table policies, matching on the first path segment being the
 user's workspace id.
 
+### 7.5 MCP
+
+Assistants call `POST /api/mcp` with `Authorization: Bearer wxm_...`. The proxy does not
+send that path to `/login`, and the response is `no-store`. Setup, the tool list, and the
+money units are in `docs/mcp.md`.
+
+A key row stores the SHA-256 of the token, scopes (`read`, `write`, `finance`), and the
+profile it acts as. The service role only looks the key up, stamps `last_used_at`, writes
+`mcp_audit_log`, and asks Auth for a short-lived session as that profile. CRM reads and
+writes then use that session, so RLS, `has_finance_access()`, and `auth.uid()` on the
+stage-history trigger stay the boundary. The finance scope is an extra gate in the app:
+a key without it cannot open invoices even when the person could.
+
+There is no delete tool, and no tool that reveals or writes credentials. Admins create and
+revoke keys at `/settings/bots`. The raw key is returned once.
+
 ---
 
 ## 8. Module specifications
