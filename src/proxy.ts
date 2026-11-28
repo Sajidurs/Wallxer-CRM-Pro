@@ -21,8 +21,12 @@ import { publicEnv } from "@/lib/env";
  * `/api/health` is here so the deployed commit can be checked without a
  * session — a health check that requires signing in cannot answer "is the app
  * up" when the answer is no.
+ *
+ * `/api/mcp` authenticates with a bot API key, not a browser session. Sending
+ * it to /login would make the endpoint unusable, and the route rejects a
+ * missing or revoked key itself.
  */
-const PUBLIC_PATHS = ["/login", "/set-password", "/auth", "/api/health"];
+const PUBLIC_PATHS = ["/login", "/set-password", "/auth", "/api/health", "/api/mcp"];
 
 /**
  * Auth redirects and every page this proxy forwards are session-dependent.
@@ -44,6 +48,14 @@ function isPublic(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  // Bot calls carry `Authorization: Bearer wxm_...`, which is not a Supabase
+  // session. Skip the cookie client entirely so that header is never treated
+  // as a user JWT, and so a health-style probe of the MCP route does not pay
+  // for an auth round trip. The route sets its own no-store headers too.
+  if (isPublic(request.nextUrl.pathname) && request.nextUrl.pathname.startsWith("/api/mcp")) {
+    return privateNoStore(NextResponse.next({ request }));
+  }
+
   // Rebuilt whenever Supabase rotates the session cookies, so the refreshed
   // tokens ride back to the browser on this same response.
   let response = NextResponse.next({ request });

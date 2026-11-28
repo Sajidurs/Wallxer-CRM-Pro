@@ -58,6 +58,7 @@ Update this file at the end of every work session, before you stop.
 - Login page, protected `(app)` route group, app shell with sidebar, topbar, and user menu.
 - Dashboard shell with placeholder counters. Stub pages for every unbuilt sidebar route.
 - Users management: add, change role, suspend, reactivate, reset password, own profile.
+- MCP at `/api/mcp` and Settings → API keys. Migration `0027_bot_api_keys.sql` is not applied. See `docs/mcp.md`.
 - Contacts: list with search and filters, create, edit, soft delete with undo, detail page.
 - Workspace `Agency` and all five brands seeded. Two real users: one super admin, one manager.
 
@@ -103,6 +104,8 @@ Update this file at the end of every work session, before you stop.
 | `0023_invoices.sql`    | Yes, 2026-09-27                   |
 | `0024_credential_vault_links.sql` | Yes, 2026-09-28       |
 | `0025_renewals.sql`    | Yes, 2026-09-28                   |
+| `0026_proposals.sql`   | In the repo before this change. Not re-checked here. |
+| `0027_bot_api_keys.sql`| **No. File only. Do not apply until reviewed.** |
 | `seed.sql`             | Yes, 2026-09-24                   |
 
 ### Environment variables in use
@@ -163,6 +166,25 @@ can be commented on, and one search box finds anything.
 ---
 
 ## Unreleased
+
+### 2026-11-28 — MCP for assistants
+
+**Added**
+
+- Remote MCP at `/api/mcp` (Streamable HTTP) so an assistant can read and update
+  the CRM with a bearer key instead of a browser session. The key acts as a
+  linked profile, so RLS and finance access still apply. Scopes are read, write,
+  and finance. Write calls are logged in `mcp_audit_log`. No delete tools, and
+  credentials are metadata only.
+- Settings → API keys, for admins. The raw key is shown once; only its hash is stored.
+
+**Files touched:** `src/app/api/mcp/route.ts`, `src/features/mcp/`, `src/features/bots/`,
+`src/app/(app)/settings/bots/page.tsx`, `src/proxy.ts`, `docs/mcp.md`
+
+**Migration:** `supabase/migrations/0027_bot_api_keys.sql` — **not applied**. Do not run it
+against production as part of this change.
+
+**Notes:** No new environment variable. Connecting a client is in `docs/mcp.md`.
 
 ### 2026-10-26 — Proposals, and Commerce Waver
 

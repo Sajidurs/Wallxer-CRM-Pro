@@ -147,6 +147,70 @@ export type Database = {
           },
         ]
       }
+      bot_api_keys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          profile_id: string
+          revoked_at: string | null
+          scopes: string[]
+          secret_hash: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          profile_id: string
+          revoked_at?: string | null
+          scopes: string[]
+          secret_hash: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          profile_id?: string
+          revoked_at?: string | null
+          scopes?: string[]
+          secret_hash?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_api_keys_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_api_keys_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_api_keys_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           address: string | null
@@ -863,6 +927,67 @@ export type Database = {
           },
           {
             foreignKeyName: "invoices_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_audit_log: {
+        Row: {
+          api_key_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          error: string | null
+          id: string
+          ok: boolean
+          profile_id: string | null
+          tool: string
+          workspace_id: string
+        }
+        Insert: {
+          api_key_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error?: string | null
+          id?: string
+          ok: boolean
+          profile_id?: string | null
+          tool: string
+          workspace_id: string
+        }
+        Update: {
+          api_key_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error?: string | null
+          id?: string
+          ok?: boolean
+          profile_id?: string | null
+          tool?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_audit_log_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "bot_api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_audit_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_audit_log_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
